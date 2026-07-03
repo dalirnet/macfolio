@@ -1,0 +1,24 @@
+# Build output
+build/
+.build/
+
+# macOS
+.DS_Store
+
+# Xcode
+xcuserdata/
+*.xcworkspace
+DerivedData/
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved
+
+# Compiled files
+*.o
+*.swiftmodule
+*.swiftdoc
+
+# Editor web bundle (build output goes to build/, covered above)
+Resources/Editor/node_modules/
+Resources/Editor/package-lock.json
