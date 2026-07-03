@@ -1,17 +1,17 @@
 @font-face {
-    font-family: "IRANSansX";
+    font-family: "Dana";
     font-style: normal;
     font-weight: 400;
     font-display: swap;
-    src: url("../Fonts/IRANSansXNoEn-Regular.ttf") format("truetype");
+    src: url("../Fonts/DanaNoEn-Regular.ttf") format("truetype");
 }
 
 @font-face {
-    font-family: "IRANSansX";
+    font-family: "Dana";
     font-style: normal;
     font-weight: 700;
     font-display: swap;
-    src: url("../Fonts/IRANSansXNoEn-Bold.ttf") format("truetype");
+    src: url("../Fonts/DanaNoEn-Bold.ttf") format("truetype");
 }
 
 @font-face {
@@ -30,15 +30,15 @@
     src: url("../Fonts/Inconsolata.ttf") format("truetype");
 }
 
-/* Palette — Latin first, Persian falls through to IRANSansX. Surface is
+/* Palette — Latin first, Persian falls through to Dana. Surface is
    transparent so the app window shows through the WebView. */
 :root {
     --mf-font-default:
-        "Sofia Sans", "IRANSansX", ui-sans-serif, system-ui, sans-serif,
+        "Sofia Sans", "Dana", ui-sans-serif, system-ui, sans-serif,
         "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
         "Noto Color Emoji";
     --mf-font-code:
-        "Inconsolata", "IRANSansX", ui-monospace, SFMono-Regular, Menlo, Monaco,
+        "Inconsolata", "Dana", ui-monospace, SFMono-Regular, Menlo, Monaco,
         Consolas, "Liberation Mono", "Courier New", monospace;
 
     --mf-fg: #1c1c1e;

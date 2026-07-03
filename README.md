@@ -24,7 +24,7 @@ new login, no web panel, right-to-left first.
   whole manuscript in context.
 - **Pick your model.** Choose Opus, Sonnet, or Haiku and the agent's permission mode in Settings.
 - **Automatic RTL.** Direction is per paragraph (`dir="auto"`) — Persian goes right-to-left, English
-  and code left-to-right, mixed freely. No language setting. The bundled **IRANSansX** font (en + fa)
+  and code left-to-right, mixed freely. No language setting. The bundled **Dana** font (en + fa)
   is used throughout.
 - **Local only.** Nothing appears in the Claude web panel; your manuscript stays on disk.
 

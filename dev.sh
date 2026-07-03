@@ -70,7 +70,7 @@ build() {
     cp Resources/Info.plist build/Macfolio.app/Contents/
     [ -f Resources/AppIcon.icns ] && cp Resources/AppIcon.icns build/Macfolio.app/Contents/Resources/
 
-    # Bundle the IRANSansX fonts (en + fa) so they work on any Mac.
+    # Bundle the Dana fonts (en + fa) so they work on any Mac.
     if [ -d Resources/Fonts ]; then
         rm -rf build/Macfolio.app/Contents/Resources/Fonts
         cp -R Resources/Fonts build/Macfolio.app/Contents/Resources/Fonts
