@@ -1,4 +1,3 @@
-import AppKit
 import Combine
 import Foundation
 
@@ -12,6 +11,8 @@ final class ProjectStore: ObservableObject {
     @Published private(set) var projects: [Project] = []
     /// Files for every project, keyed by project id — drives the sidebar tree.
     @Published private(set) var filesByProject: [String: [ProjectFile]] = [:]
+    /// Image files under every project, keyed by project id — shown in the sidebar.
+    @Published private(set) var mediaByProject: [String: [URL]] = [:]
     @Published private(set) var project: Project?
     @Published private(set) var files: [ProjectFile] = []
     @Published var selected: ProjectFile? {
@@ -46,8 +47,13 @@ final class ProjectStore: ObservableObject {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
 
         var map: [String: [ProjectFile]] = [:]
-        for project in projects { map[project.id] = loadFiles(project) }
+        var media: [String: [URL]] = [:]
+        for project in projects {
+            map[project.id] = loadFiles(project)
+            media[project.id] = loadMedia(project)
+        }
         filesByProject = map
+        mediaByProject = media
     }
 
     /// Create a new project (folder name = title) and open it. Deduplicates names.
@@ -100,6 +106,7 @@ final class ProjectStore: ObservableObject {
         }
         files = loadFiles(project)
         filesByProject[project.id] = files
+        mediaByProject[project.id] = loadMedia(project)
         if selected == nil || !files.contains(where: { $0.id == selected?.id }) {
             selected = restoredFile() ?? files.first
         }
@@ -135,18 +142,33 @@ final class ProjectStore: ObservableObject {
             .map { ProjectFile(url: $0) }
     }
 
+    private static let imageExtensions: Set<String> = [
+        "png", "jpg", "jpeg", "gif", "svg",
+    ]
+
+    // Every image file anywhere under the project (e.g. an `images/` subfolder).
+    private func loadMedia(_ project: Project) -> [URL] {
+        let enumerator = FileManager.default.enumerator(
+            at: project.root, includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles, .skipsPackageDescendants])
+        var urls: [URL] = []
+        while let url = enumerator?.nextObject() as? URL {
+            if Self.imageExtensions.contains(url.pathExtension.lowercased()) {
+                urls.append(url)
+            }
+        }
+        return urls.sorted {
+            $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent)
+                == .orderedAscending
+        }
+    }
+
     func text(of file: ProjectFile) -> String {
         (try? String(contentsOf: file.url, encoding: .utf8)) ?? ""
     }
 
     func save(_ text: String, to file: ProjectFile) {
         try? text.write(to: file.url, atomically: true, encoding: .utf8)
-    }
-
-    /// Copy a file's Markdown to the clipboard.
-    func copyMarkdown(_ file: ProjectFile) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text(of: file), forType: .string)
     }
 
     // MARK: - File operations
@@ -164,6 +186,23 @@ final class ProjectStore: ObservableObject {
         openProject(target)
         selected = files.first { $0.url == url }
         refreshProjects()
+    }
+
+    /// Rename a project (its folder). Deduplicates; re-opens if it was open.
+    func renameProject(_ project: Project, to title: String) {
+        let safe =
+            title.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: "-")
+        guard !safe.isEmpty else { return }
+        let newRoot = project.root.deletingLastPathComponent().appendingPathComponent(safe)
+        guard newRoot != project.root, !FileManager.default.fileExists(atPath: newRoot.path)
+        else { return }
+        try? FileManager.default.moveItem(at: project.root, to: newRoot)
+        let wasOpen = self.project?.id == project.id
+        refreshProjects()
+        if wasOpen {
+            openProject(Project(root: newRoot, title: newRoot.lastPathComponent))
+        }
     }
 
     /// Rename a file.
@@ -187,6 +226,12 @@ final class ProjectStore: ObservableObject {
         guard mdCount > 1 else { return }  // a project always keeps ≥ 1 file
         try? FileManager.default.removeItem(at: file.url)
         reload(after: file, select: nil)
+    }
+
+    /// Move a project image to the Trash and refresh the sidebar media list.
+    func deleteMedia(_ url: URL) {
+        try? FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        refreshProjects()
     }
 
     // MARK: - Helpers
