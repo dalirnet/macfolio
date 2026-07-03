@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The studio: a native sidebar of **projects › files**, and a main area with the
@@ -9,18 +10,14 @@ struct MainView: View {
 
     @State private var draft = ""
     @State private var chatOpen = true
-    @State private var showSettings = false
     /// Bumped after the agent edits files, to reload the editor from disk.
     @State private var editorReload = 0
-    /// Editor dialogs (table / link / image) requested by the WebView editor.
-    @StateObject private var editorBridge = EditorBridge()
-
     /// Projects whose file list is expanded in the sidebar (seeded with the
     /// restored open project so its file is visible on launch).
     @State private var expandedProjects: Set<String> =
         ProjectStore.shared.project.map { [$0.id] } ?? []
 
-    // Text prompts (New Project / New File / Rename).
+    // Text prompts (New Project / New Document / Rename).
     @State private var showNewProject = false
     @State private var newProjectTitle = ""
     @State private var showAddFile = false
@@ -28,6 +25,8 @@ struct MainView: View {
     @State private var addFileProject: Project?
     @State private var renameTarget: ProjectFile?
     @State private var renameTitle = ""
+    @State private var renameProjectTarget: Project?
+    @State private var renameProjectTitle = ""
 
     var body: some View {
         NavigationSplitView {
@@ -48,17 +47,16 @@ struct MainView: View {
                             : "bubble.left.and.bubble.right")
                 }
                 Button {
-                    showSettings = true
+                    SettingsDialog.present()
                 } label: {
                     Image(systemName: "gearshape")
                 }
             }
         }
-        .sheet(isPresented: $showSettings) { SettingsView { showSettings = false } }
-        .sheet(item: $editorBridge.dialog) { editorDialog($0) }
         .alert("New Project", isPresented: $showNewProject) { newProjectPrompt }
-        .alert("New File", isPresented: $showAddFile) { newFilePrompt }
-        .alert("Rename File", isPresented: renameBinding) { renamePrompt }
+        .alert("New Document", isPresented: $showAddFile) { newFilePrompt }
+        .alert("Rename Document", isPresented: renameBinding) { renamePrompt }
+        .alert("Rename Project", isPresented: renameProjectBinding) { renameProjectPrompt }
         .onAppear {
             chat.activate(projects.project)
             expandOpenProject()
@@ -72,37 +70,7 @@ struct MainView: View {
         }
     }
 
-    // MARK: - Modals (editor dialogs + text prompts)
-
-    @ViewBuilder
-    private func editorDialog(_ dialog: EditorBridge.Dialog) -> some View {
-        switch dialog {
-        case .table:
-            TableDialogView { rows, cols in
-                editorBridge.insertTable?(rows, cols)
-                editorBridge.dialog = nil
-            } onCancel: {
-                editorBridge.dialog = nil
-            }
-        case .link(let url):
-            LinkDialogView(initialURL: url) { newURL in
-                editorBridge.setLink?(newURL)
-                editorBridge.dialog = nil
-            } onRemove: {
-                editorBridge.setLink?("")
-                editorBridge.dialog = nil
-            } onCancel: {
-                editorBridge.dialog = nil
-            }
-        case .image(let items):
-            ImageDialogView(items: items) { item in
-                editorBridge.insertImage?(item.src, item.alt)
-                editorBridge.dialog = nil
-            } onCancel: {
-                editorBridge.dialog = nil
-            }
-        }
-    }
+    // MARK: - Text prompts (New / Rename)
 
     @ViewBuilder
     private var newProjectPrompt: some View {
@@ -136,6 +104,18 @@ struct MainView: View {
         Button("Cancel", role: .cancel) {}
     }
 
+    @ViewBuilder
+    private var renameProjectPrompt: some View {
+        TextField("Name", text: $renameProjectTitle)
+        Button("Rename") {
+            if let project = renameProjectTarget {
+                let title = renameProjectTitle.trimmingCharacters(in: .whitespaces)
+                if !title.isEmpty { projects.renameProject(project, to: title) }
+            }
+        }
+        Button("Cancel", role: .cancel) {}
+    }
+
     // MARK: - Sidebar tree (projects › files)
 
     private var sidebar: some View {
@@ -146,6 +126,14 @@ struct MainView: View {
                         Label(child.title, systemImage: "doc.text")
                             .tag(child)
                             .contextMenu { nodeMenu(child) }
+                    }
+                    if let media = projects.mediaByProject[project.project.id],
+                        !media.isEmpty
+                    {
+                        Divider()
+                        ForEach(media, id: \.self) { url in
+                            mediaRow(url)
+                        }
                     }
                 } label: {
                     Label(project.title, systemImage: "folder")
@@ -220,11 +208,22 @@ struct MainView: View {
         }
     }
 
+    // Project image — Open (preview) / Delete via the context menu. Insertion is
+    // done from the editor's Image toolbar button.
+    private func mediaRow(_ url: URL) -> some View {
+        Label(url.lastPathComponent, systemImage: "photo")
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .contextMenu {
+                Button("Open") { NSWorkspace.shared.open(url) }
+                Button("Delete", role: .destructive) { projects.deleteMedia(url) }
+            }
+    }
+
     @ViewBuilder
     private func nodeMenu(_ node: SidebarNode) -> some View {
         if let file = node.file {
-            Button("Copy Markdown") { projects.copyMarkdown(file) }
-            Button("Rename…") {
+            Button("Rename") {
                 renameTitle = file.title
                 renameTarget = file
             }
@@ -232,7 +231,14 @@ struct MainView: View {
             Button("Delete", role: .destructive) { projects.delete(file) }
                 .disabled((projects.filesByProject[node.project.id]?.count ?? 0) <= 1)
         } else {
-            Button("New File") { startAddFile(node.project) }
+            Button("New Document") { startAddFile(node.project) }
+            Button("Rename") {
+                renameProjectTitle = node.project.title
+                renameProjectTarget = node.project
+            }
+            Button("Reveal in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting([node.project.root])
+            }
             Divider()
             Button("Delete Project", role: .destructive) { projects.deleteProject(node.project) }
         }
@@ -265,12 +271,11 @@ struct MainView: View {
                 editable: !chat.working,
                 fileURL: file.url,
                 projectRoot: projects.project?.root,
-                bridge: editorBridge,
                 onSave: { text in projects.save(text, to: file) }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            EmptyState("Select or add a file", icon: "doc.text")
+            EmptyState("Select or add a document", icon: "doc.text")
         }
     }
 
@@ -393,6 +398,12 @@ struct MainView: View {
 
     private var renameBinding: Binding<Bool> {
         Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })
+    }
+
+    private var renameProjectBinding: Binding<Bool> {
+        Binding(
+            get: { renameProjectTarget != nil },
+            set: { if !$0 { renameProjectTarget = nil } })
     }
 
     private func send() {
