@@ -1,4 +1,9 @@
-import { $createCodeNode, CodeHighlightNode, CodeNode } from "@lexical/code";
+import {
+    $createCodeNode,
+    $isCodeNode,
+    CodeHighlightNode,
+    CodeNode,
+} from "@lexical/code";
 import { registerCodeHighlighting } from "@lexical/code-prism";
 import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import {
@@ -47,25 +52,28 @@ import {
 import { $findMatchingParent, mergeRegister } from "@lexical/utils";
 import {
     $applyNodeReplacement,
+    $createNodeSelection,
     $createParagraphNode,
     $getNearestNodeFromDOMNode,
     $getRoot,
     $getSelection,
+    $isNodeSelection,
+    $isParagraphNode,
     $isRangeSelection,
     $setSelection,
+    CAN_REDO_COMMAND,
+    CAN_UNDO_COMMAND,
     COMMAND_PRIORITY_EDITOR,
     COMMAND_PRIORITY_LOW,
     DecoratorNode,
     FORMAT_TEXT_COMMAND,
+    REDO_COMMAND,
     SELECTION_CHANGE_COMMAND,
+    UNDO_COMMAND,
     createEditor,
 } from "lexical";
 
-import type {
-    ElementTransformer,
-    TextMatchTransformer,
-    Transformer,
-} from "@lexical/markdown";
+import type { ElementTransformer, Transformer } from "@lexical/markdown";
 import type { HeadingTagType } from "@lexical/rich-text";
 import type {
     BaseSelection,
@@ -90,8 +98,9 @@ import italicIcon from "../Icons/italic.svg?raw";
 import linkIcon from "../Icons/link.svg?raw";
 import orderedListIcon from "../Icons/orderedList.svg?raw";
 import quoteIcon from "../Icons/quote.svg?raw";
+import redoIcon from "../Icons/redo.svg?raw";
 import tableIcon from "../Icons/table.svg?raw";
-import textIcon from "../Icons/text.svg?raw";
+import undoIcon from "../Icons/undo.svg?raw";
 
 import "./index.css";
 
@@ -105,7 +114,8 @@ declare global {
         // Called back by the Swift host after a native dialog resolves.
         macfolioInsertTable: (rows: number, cols: number) => void;
         macfolioSetLink: (url: string) => void;
-        macfolioInsertImage: (src: string, alt: string) => void;
+        macfolioSetImage: (src: string, alt: string) => void;
+        macfolioInsertCodeBlock: (language: string) => void;
         webkit?: {
             messageHandlers: Record<
                 string,
@@ -238,7 +248,7 @@ const theme: EditorThemeClasses = {
 
 // --- Custom nodes (vanilla DecoratorNodes) ---
 
-// Divider — renders <hr>.
+// Divider — a horizontal rule, rendered as a div (see createDOM).
 class HorizontalRuleNode extends DecoratorNode<null> {
     static getType(): string {
         return "horizontalrule";
@@ -257,9 +267,10 @@ class HorizontalRuleNode extends DecoratorNode<null> {
     }
 
     createDOM(): HTMLElement {
-        const hr = document.createElement("hr");
-        hr.className = "mf-hr";
-        return hr;
+        // A div, not <hr> — WebKit renders <hr> height inconsistently.
+        const line = document.createElement("div");
+        line.className = "mf-hr";
+        return line;
     }
 
     getTextContent(): string {
@@ -341,13 +352,20 @@ class ImageNode extends DecoratorNode<null> {
     }
 
     createDOM(): HTMLElement {
-        const span = document.createElement("span");
-        span.className = "mf-image";
+        const figure = document.createElement("figure");
+        figure.className = "mf-image";
         const img = document.createElement("img");
         img.src = mediaUrl(this.__src);
         img.alt = this.__alt;
-        span.appendChild(img);
-        return span;
+        figure.appendChild(img);
+        // Alt, when set, reads as a centered caption below the image.
+        if (this.__alt) {
+            const caption = document.createElement("figcaption");
+            caption.className = "mf-image-alt";
+            caption.textContent = this.__alt;
+            figure.appendChild(caption);
+        }
+        return figure;
     }
 
     updateDOM(): boolean {
@@ -359,7 +377,9 @@ class ImageNode extends DecoratorNode<null> {
     }
 
     isInline(): boolean {
-        return true;
+        // Block-level: an image owns its line, so no caret can sit beside it and
+        // no text can be typed alongside it.
+        return false;
     }
 
     decorate(): null {
@@ -371,11 +391,14 @@ function $createImageNode(src: string, alt: string): ImageNode {
     return $applyNodeReplacement(new ImageNode(src, alt));
 }
 
-function $isImageNode(
-    node: LexicalNode | null | undefined,
-): node is ImageNode {
+function $isImageNode(node: LexicalNode | null | undefined): node is ImageNode {
     return node instanceof ImageNode;
 }
+
+// The caret captured when the editor loses focus (e.g. clicking a sidebar image,
+// or opening the native code-language picker), restored before the host callback
+// inserts so the change lands where the cursor was.
+let savedSelection: BaseSelection | null = null;
 
 // --- Markdown transformers (divider + GFM table) and the full transformer set ---
 
@@ -433,6 +456,32 @@ function $createTableCell(text: string, isHeader: boolean): TableCellNode {
         cell,
     );
     return cell;
+}
+
+// Grow/shrink an existing table to `rows`×`cols`, keeping existing cell content.
+function resizeTable(table: TableNode, rows: number, cols: number): void {
+    const rowNodes = table.getChildren().filter($isTableRowNode);
+    // Match each existing row's column count.
+    rowNodes.forEach((row, r) => {
+        const cells = row.getChildren().filter($isTableCellNode);
+        for (let c = cells.length; c < cols; c++) {
+            row.append($createTableCell("", r === 0));
+        }
+        for (let c = cells.length - 1; c >= cols; c--) {
+            cells[c].remove();
+        }
+    });
+    // Add missing rows / remove extra ones.
+    for (let r = rowNodes.length; r < rows; r++) {
+        const row = $createTableRowNode();
+        for (let c = 0; c < cols; c++) {
+            row.append($createTableCell("", false));
+        }
+        table.append(row);
+    }
+    for (let r = rowNodes.length - 1; r >= rows; r--) {
+        rowNodes[r].remove();
+    }
 }
 
 // GFM tables. Import consumes the whole `|...|` block at once (via
@@ -520,8 +569,8 @@ const TABLE_TRANSFORMER: Transformer = {
     type: "multiline-element",
 };
 
-// Image: `![alt](src)`. Tried before the default LINK so the `!` prefix wins.
-const IMAGE_TRANSFORMER: TextMatchTransformer = {
+// Image: a whole line of `![alt](src)` becomes a block-level image node.
+const IMAGE_TRANSFORMER: ElementTransformer = {
     dependencies: [ImageNode],
     export(node) {
         if (!$isImageNode(node)) {
@@ -529,14 +578,19 @@ const IMAGE_TRANSFORMER: TextMatchTransformer = {
         }
         return `![${node.getAlt()}](${node.getSrc()})`;
     },
-    importRegExp: /!\[([^\]]*)\]\(([^)]+)\)/,
-    regExp: /!\[([^\]]*)\]\(([^)]+)\)$/,
-    replace(textNode, match) {
+    regExp: /^!\[([^\]]*)\]\(([^)]+)\)\s?$/,
+    replace(parentNode, _children, match, isImport) {
         const [, alt, src] = match;
-        textNode.replace($createImageNode(src, alt));
+        const image = $createImageNode(src, alt);
+        if (isImport || parentNode.getNextSibling() != null) {
+            parentNode.replace(image);
+        } else {
+            parentNode.insertBefore(image);
+        }
+        image.selectNext();
     },
-    trigger: ")",
-    type: "text-match",
+    triggerOnEnter: true,
+    type: "element",
 };
 
 // Single source of truth for Markdown <-> editor conversion, used by both the
@@ -556,6 +610,27 @@ interface BlockItem {
     icon: string;
     label: string;
     run: (editor: LexicalEditor) => void;
+    // True when the caret's block is this type — highlights the button (read only).
+    active?: () => boolean;
+}
+
+// The caret's top-level block, or null when the selection isn't a caret. Read only.
+function $caretTopLevel(): LexicalNode | null {
+    const selection = $getSelection();
+    return $isRangeSelection(selection)
+        ? selection.anchor.getNode().getTopLevelElement()
+        : null;
+}
+
+// Whether the caret sits inside a table (read only).
+function $inTable(): boolean {
+    const selection = $getSelection();
+    return (
+        $isRangeSelection(selection) &&
+        $isTableNode(
+            $findMatchingParent(selection.anchor.getNode(), $isTableNode),
+        )
+    );
 }
 
 // Convert the current block(s) into `factory`'s node type.
@@ -577,21 +652,88 @@ function heading(tag: HeadingTagType): (editor: LexicalEditor) => void {
     };
 }
 
-// Grouped for the toolbar; a thin separator is drawn between groups.
+// Grouped for the toolbar (a thin separator is drawn between groups), ordered by
+// popularity: the right group sits at the toolbar's right edge, so the most-used
+// blocks (headings, then lists) go last and the least-used (quote / code / table)
+// go first.
 const BLOCK_GROUPS: BlockItem[][] = [
     [
         {
-            icon: textIcon,
-            label: "Paragraph",
+            icon: codeBlockIcon,
+            label: "Code Block",
+            // Ask the host for the language picker, preselecting the caret's code
+            // block language so it can be changed (see macfolioInsertCodeBlock).
             run(editor) {
-                setBlock(editor, () => {
-                    return $createParagraphNode();
+                let current = "";
+                editor.getEditorState().read(() => {
+                    const block = $caretTopLevel();
+                    if ($isCodeNode(block)) {
+                        current = block.getLanguage() ?? "";
+                    }
                 });
+                post("code", current);
+            },
+            active: () => $isCodeNode($caretTopLevel()),
+        },
+        {
+            icon: tableIcon,
+            label: "Table",
+            // Ask the host for the rows/cols dialog, prefilled from the caret's
+            // table so it can be resized (see macfolioInsertTable).
+            run(editor) {
+                let dims: { rows: number; cols: number } | null = null;
+                editor.getEditorState().read(() => {
+                    const selection = $getSelection();
+                    if (!$isRangeSelection(selection)) {
+                        return;
+                    }
+                    const table = $findMatchingParent(
+                        selection.anchor.getNode(),
+                        $isTableNode,
+                    );
+                    if ($isTableNode(table)) {
+                        const rowNodes = table
+                            .getChildren()
+                            .filter($isTableRowNode);
+                        dims = {
+                            rows: rowNodes.length,
+                            cols:
+                                rowNodes[0]
+                                    ?.getChildren()
+                                    .filter($isTableCellNode).length ?? 0,
+                        };
+                    }
+                });
+                post("table", dims);
+            },
+            active: $inTable,
+        },
+        {
+            icon: imageIcon,
+            label: "Image",
+            // Ask the host for the image picker + alt field, prefilled when an
+            // image is selected so it can be changed (see macfolioSetImage).
+            run(editor) {
+                let data: { src: string; alt: string } | null = null;
+                editor.getEditorState().read(() => {
+                    const selection = $getSelection();
+                    const node = $isNodeSelection(selection)
+                        ? selection.getNodes().find($isImageNode)
+                        : null;
+                    if ($isImageNode(node)) {
+                        data = { src: node.getSrc(), alt: node.getAlt() };
+                    }
+                });
+                post("image", data);
+            },
+            active: () => {
+                const selection = $getSelection();
+                return (
+                    $isNodeSelection(selection) &&
+                    selection.getNodes().some($isImageNode)
+                );
             },
         },
-        { icon: h1Icon, label: "Heading 1", run: heading("h1") },
-        { icon: h2Icon, label: "Heading 2", run: heading("h2") },
-        { icon: h3Icon, label: "Heading 3", run: heading("h3") },
     ],
     [
         {
@@ -611,8 +753,6 @@ const BLOCK_GROUPS: BlockItem[][] = [
                 editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined);
             },
         },
-    ],
-    [
         {
             icon: quoteIcon,
             label: "Quote",
@@ -622,36 +762,17 @@ const BLOCK_GROUPS: BlockItem[][] = [
                 });
             },
         },
-        {
-            icon: codeBlockIcon,
-            label: "Code Block",
-            run(editor) {
-                setBlock(editor, () => {
-                    return $createCodeNode();
-                });
-            },
-        },
-        {
-            icon: tableIcon,
-            label: "Table",
-            // Ask the host for a native rows/cols dialog (see macfolioInsertTable).
-            run() {
-                post("table");
-            },
-        },
-        {
-            icon: imageIcon,
-            label: "Image",
-            // Ask the host for the project image picker (see macfolioInsertImage).
-            run() {
-                post("image");
-            },
-        },
+    ],
+    [
+        { icon: h3Icon, label: "Heading 3", run: heading("h3") },
+        { icon: h2Icon, label: "Heading 2", run: heading("h2") },
+        { icon: h1Icon, label: "Heading 1", run: heading("h1") },
     ],
 ];
 
-// Sticky top toolbar that inserts / converts blocks. Buttons act on the current
-// selection (falling back to the document end when nothing is focused yet).
+// Sticky top toolbar: a left group of document actions (undo / redo / copy the
+// Markdown) and a right group that inserts / converts blocks. Block buttons act on
+// the current selection (falling back to the document end when nothing is focused).
 function registerBlockToolbar(
     editor: LexicalEditor,
     container: HTMLElement,
@@ -661,21 +782,56 @@ function registerBlockToolbar(
         e.preventDefault();
     });
 
+    function iconButton(
+        icon: string,
+        label: string,
+        onClick: () => void,
+    ): HTMLButtonElement {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "mf-block-btn";
+        btn.title = label;
+        btn.innerHTML = icon;
+        btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            onClick();
+        });
+        return btn;
+    }
+
+    const separator = (): HTMLSpanElement => {
+        const sep = document.createElement("span");
+        sep.className = "mf-block-sep";
+        return sep;
+    };
+
+    const left = document.createElement("div");
+    left.className = "mf-toolbar-side";
+
+    const undoBtn = iconButton(undoIcon, "Undo", () => {
+        editor.dispatchCommand(UNDO_COMMAND, undefined);
+        editor.focus();
+    });
+    const redoBtn = iconButton(redoIcon, "Redo", () => {
+        editor.dispatchCommand(REDO_COMMAND, undefined);
+        editor.focus();
+    });
+    undoBtn.disabled = true;
+    redoBtn.disabled = true;
+    left.append(undoBtn, redoBtn);
+
+    const right = document.createElement("div");
+    right.className = "mf-toolbar-side";
+
+    // Buttons that light up (primary) when the caret sits in their block type.
+    const actives: Array<{ btn: HTMLButtonElement; active: () => boolean }> =
+        [];
     BLOCK_GROUPS.forEach((group, index) => {
         if (index > 0) {
-            const sep = document.createElement("span");
-            sep.className = "mf-block-sep";
-            container.appendChild(sep);
+            right.appendChild(separator());
         }
-
         for (const item of group) {
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "mf-block-btn";
-            btn.title = item.label;
-            btn.innerHTML = item.icon;
-            btn.addEventListener("click", (e) => {
-                e.preventDefault();
+            const btn = iconButton(item.icon, item.label, () => {
                 if (!editor.isEditable()) {
                     return;
                 }
@@ -687,16 +843,46 @@ function registerBlockToolbar(
                 item.run(editor);
                 editor.focus();
             });
-            container.appendChild(btn);
+            right.appendChild(btn);
+            if (item.active) {
+                actives.push({ btn, active: item.active });
+            }
         }
     });
 
-    const cleanup = editor.registerEditableListener((editable) => {
-        container.classList.toggle("mf-block-toolbar--disabled", !editable);
-    });
+    container.append(left, right);
+
+    const unregister = mergeRegister(
+        editor.registerEditableListener((editable) => {
+            container.classList.toggle("mf-block-toolbar--disabled", !editable);
+        }),
+        editor.registerCommand(
+            CAN_UNDO_COMMAND,
+            (payload) => {
+                undoBtn.disabled = !payload;
+                return false;
+            },
+            COMMAND_PRIORITY_LOW,
+        ),
+        editor.registerCommand(
+            CAN_REDO_COMMAND,
+            (payload) => {
+                redoBtn.disabled = !payload;
+                return false;
+            },
+            COMMAND_PRIORITY_LOW,
+        ),
+        editor.registerUpdateListener(() => {
+            editor.getEditorState().read(() => {
+                for (const { btn, active } of actives) {
+                    btn.classList.toggle("mf-block-btn--active", active());
+                }
+            });
+        }),
+    );
 
     return () => {
-        cleanup();
+        unregister();
         container.innerHTML = "";
     };
 }
@@ -962,11 +1148,14 @@ function registerTableDirection(editor: LexicalEditor): () => void {
 // --- Remove button (per block) ---
 
 const REMOVE_ICON =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-    'stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    '<svg viewBox="0 0 24 24" fill="currentColor">' +
+    '<g transform="translate(4.15 2.98) scale(0.83)"><path d="' +
+    "M6.5625 18.6035C6.93359 18.6035 7.17773 18.3691 7.16797 18.0273L6.86523 7.57812C6.85547 7.23633 6.61133 7.01172 6.25977 7.01172C5.88867 7.01172 5.64453 7.24609 5.6543 7.58789L5.94727 18.0273C5.95703 18.3789 6.20117 18.6035 6.5625 18.6035ZM9.45312 18.6035C9.82422 18.6035 10.0879 18.3691 10.0879 18.0273L10.0879 7.58789C10.0879 7.24609 9.82422 7.01172 9.45312 7.01172C9.08203 7.01172 8.82812 7.24609 8.82812 7.58789L8.82812 18.0273C8.82812 18.3691 9.08203 18.6035 9.45312 18.6035ZM12.3535 18.6035C12.7051 18.6035 12.9492 18.3789 12.959 18.0273L13.252 7.58789C13.2617 7.24609 13.0176 7.01172 12.6465 7.01172C12.2949 7.01172 12.0508 7.23633 12.041 7.58789L11.748 18.0273C11.7383 18.3691 11.9824 18.6035 12.3535 18.6035ZM5.16602 4.46289L6.71875 4.46289L6.71875 2.37305C6.71875 1.81641 7.10938 1.45508 7.69531 1.45508L11.1914 1.45508C11.7773 1.45508 12.168 1.81641 12.168 2.37305L12.168 4.46289L13.7207 4.46289L13.7207 2.27539C13.7207 0.859375 12.8027 0 11.2988 0L7.58789 0C6.08398 0 5.16602 0.859375 5.16602 2.27539ZM0.732422 5.24414L18.1836 5.24414C18.584 5.24414 18.9062 4.90234 18.9062 4.50195C18.9062 4.10156 18.584 3.76953 18.1836 3.76953L0.732422 3.76953C0.341797 3.76953 0 4.10156 0 4.50195C0 4.91211 0.341797 5.24414 0.732422 5.24414ZM4.98047 21.748L13.9355 21.748C15.332 21.748 16.2695 20.8398 16.3379 19.4434L17.0215 5.05859L15.4492 5.05859L14.7949 19.2773C14.7754 19.8633 14.3555 20.2734 13.7793 20.2734L5.11719 20.2734C4.56055 20.2734 4.14062 19.8535 4.11133 19.2773L3.41797 5.05859L1.88477 5.05859L2.57812 19.4531C2.64648 20.8496 3.56445 21.748 4.98047 21.748Z" +
+    '"/></g></svg>';
 
-// A "×" in the side gutter of the hovered block; clicking it deletes that block.
-// Returns a teardown.
+// A "×" in the side gutter of the focused block; clicking it deletes that block.
+// Follows the caret/selection (not the mouse), so it appears for whichever block
+// is currently focused. Returns a teardown.
 function registerBlockRemove(
     editor: LexicalEditor,
     scrollEl: HTMLElement,
@@ -986,75 +1175,16 @@ function registerBlockRemove(
     });
     document.body.appendChild(button);
 
-    const SHOW_DELAY = 280;
-
     let target: HTMLElement | null = null;
-    let showTimer: ReturnType<typeof setTimeout> | undefined;
-    let hideTimer: ReturnType<typeof setTimeout> | undefined;
-
-    function cancelShow(): void {
-        clearTimeout(showTimer);
-    }
-
-    function cancelHide(): void {
-        clearTimeout(hideTimer);
-    }
 
     function hide(): void {
-        cancelShow();
-        cancelHide();
         button.classList.remove("mf-remove-btn--visible");
         target = null;
     }
 
-    // Debounced so a small gap between the block and the button doesn't flicker.
-    function scheduleHide(): void {
-        cancelShow();
-        cancelHide();
-        hideTimer = setTimeout(() => {
-            hide();
-        }, 220);
-    }
-
-    // Show after a short settle so the button doesn't blink in as the cursor
-    // sweeps across blocks. Once visible, following a new block is immediate.
-    function scheduleShow(el: HTMLElement): void {
-        cancelHide();
-        if (el === target) {
-            return;
-        }
-        if (target) {
-            showFor(el);
-            return;
-        }
-        cancelShow();
-        showTimer = setTimeout(() => {
-            showFor(el);
-        }, SHOW_DELAY);
-    }
-
-    // The top-level block (direct child of the editor root) enclosing `node`.
-    function blockFrom(node: EventTarget | null): HTMLElement | null {
-        let el = node as HTMLElement | null;
-        while (el && el !== editorEl) {
-            if (el.parentElement === editorEl) {
-                return el;
-            }
-            el = el.parentElement;
-        }
-        return null;
-    }
-
-    function showFor(el: HTMLElement): void {
-        cancelShow();
-        cancelHide();
-        if (el === target) {
-            return; // already pointing at this block — don't re-position/flicker
-        }
-        target = el;
-
-        // Sit in the side gutter (never over the block): start side for LTR,
-        // end side for RTL. Vertically centered on the block.
+    // Sit in the block's side gutter (start side for LTR, end for RTL), vertically
+    // centered — never over the block.
+    function positionFor(el: HTMLElement): void {
         const size = 22;
         const gap = 8;
         const rect = el.getBoundingClientRect();
@@ -1064,24 +1194,50 @@ function registerBlockRemove(
             left = rect.right + gap;
         }
         const top = rect.top + (rect.height - size) / 2;
-
         button.style.top = `${Math.round(top)}px`;
         button.style.left = `${Math.round(left)}px`;
-        button.classList.add("mf-remove-btn--visible");
     }
 
-    const onMouseMove = (e: MouseEvent) => {
-        if (!editor.isEditable()) {
-            hide();
-            return;
-        }
-        const el = blockFrom(e.target);
+    // DOM element of the top-level block holding the current selection (works for
+    // text blocks via the caret and for decorators — image / divider — selected
+    // as a node).
+    function focusedBlockEl(): HTMLElement | null {
+        return editor.getEditorState().read(() => {
+            const selection = $getSelection();
+            const node = $isRangeSelection(selection)
+                ? selection.anchor.getNode()
+                : (selection?.getNodes()[0] ?? null);
+            if (!node) {
+                return null;
+            }
+            // A caret inside a table targets the whole table, not the cell.
+            const table = $findMatchingParent(node, $isTableNode);
+            const top =
+                ($isTableNode(table) ? table : node.getTopLevelElement()) ??
+                node;
+            // The auto-enforced trailing empty paragraph isn't removable — deleting
+            // it would just be re-added.
+            if (
+                $isParagraphNode(top) &&
+                top.getTextContentSize() === 0 &&
+                top.getNextSibling() === null
+            ) {
+                return null;
+            }
+            return editor.getElementByKey(top.getKey());
+        });
+    }
+
+    function refresh(): void {
+        const el = editor.isEditable() ? focusedBlockEl() : null;
         if (el) {
-            scheduleShow(el);
+            target = el;
+            positionFor(el);
+            button.classList.add("mf-remove-btn--visible");
         } else {
-            scheduleHide();
+            hide();
         }
-    };
+    }
 
     const onClick = () => {
         const el = target;
@@ -1095,30 +1251,117 @@ function registerBlockRemove(
                 root.append($createParagraphNode());
             }
         });
-        hide();
         editor.focus();
     };
 
-    const onScroll = () => {
-        hide();
+    const reposition = () => {
+        if (target) {
+            positionFor(target);
+        }
     };
 
-    // Keep the button alive while the pointer is on it (it overlaps the block).
-    button.addEventListener("mouseenter", cancelHide);
-    button.addEventListener("mouseleave", scheduleHide);
     button.addEventListener("click", onClick);
-    scrollEl.addEventListener("mousemove", onMouseMove);
-    scrollEl.addEventListener("mouseleave", scheduleHide);
-    scrollEl.addEventListener("scroll", onScroll, true);
+    editorEl.addEventListener("blur", hide);
+    editorEl.addEventListener("focus", refresh);
+    scrollEl.addEventListener("scroll", reposition, true);
+    const unregisterUpdate = editor.registerUpdateListener(() => {
+        refresh();
+    });
 
     return () => {
-        cancelShow();
-        cancelHide();
-        scrollEl.removeEventListener("mousemove", onMouseMove);
-        scrollEl.removeEventListener("mouseleave", scheduleHide);
-        scrollEl.removeEventListener("scroll", onScroll, true);
+        unregisterUpdate();
+        editorEl.removeEventListener("blur", hide);
+        editorEl.removeEventListener("focus", refresh);
+        scrollEl.removeEventListener("scroll", reposition, true);
         button.remove();
     };
+}
+
+// --- Block decorator selection ---
+
+// Clicking a block decorator (image or divider) selects it as a node, so it reads
+// as selected — the toolbar icon lights up, the remove button appears, and no text
+// caret sits on it.
+function registerDecoratorSelection(editor: LexicalEditor): () => void {
+    const root = editor.getRootElement();
+    if (!root) {
+        return () => {};
+    }
+
+    const onClick = (e: MouseEvent) => {
+        const el = (e.target as HTMLElement).closest(".mf-image, .mf-hr");
+        if (!el) {
+            return;
+        }
+        editor.update(() => {
+            const node = $getNearestNodeFromDOMNode(el);
+            if ($isImageNode(node) || $isHorizontalRuleNode(node)) {
+                const selection = $createNodeSelection();
+                selection.add(node.getKey());
+                $setSelection(selection);
+            }
+        });
+    };
+    root.addEventListener("click", onClick);
+    return () => root.removeEventListener("click", onClick);
+}
+
+// --- Table click guard ---
+
+// The cell nearest a point, for redirecting stray clicks into the table.
+function nearestCell(
+    tableEl: HTMLElement,
+    x: number,
+    y: number,
+): HTMLElement | null {
+    let best: HTMLElement | null = null;
+    let bestDist = Infinity;
+    tableEl.querySelectorAll<HTMLElement>(".mf-td, .mf-th").forEach((cell) => {
+        const r = cell.getBoundingClientRect();
+        const dx = Math.max(r.left - x, 0, x - r.right);
+        const dy = Math.max(r.top - y, 0, y - r.bottom);
+        const dist = dx * dx + dy * dy;
+        if (dist < bestDist) {
+            bestDist = dist;
+            best = cell;
+        }
+    });
+    return best;
+}
+
+// A click on a table's chrome or the empty space beside it drops the caret before
+// the table (where typing spawns a stray paragraph). Redirect such clicks into the
+// nearest cell so text only goes inside cells.
+function registerTableClickGuard(editor: LexicalEditor): () => void {
+    const root = editor.getRootElement();
+    if (!root) {
+        return () => {};
+    }
+
+    const onMouseDown = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.closest(".mf-td, .mf-th")) {
+            return; // a real cell click — leave it alone
+        }
+        for (const tableEl of root.querySelectorAll<HTMLElement>(".mf-table")) {
+            const rect = tableEl.getBoundingClientRect();
+            if (e.clientY < rect.top || e.clientY > rect.bottom) {
+                continue;
+            }
+            e.preventDefault();
+            const cellEl = nearestCell(tableEl, e.clientX, e.clientY);
+            editor.update(() => {
+                const cell = cellEl ? $getNearestNodeFromDOMNode(cellEl) : null;
+                if ($isTableCellNode(cell)) {
+                    cell.selectEnd();
+                }
+            });
+            editor.focus();
+            return;
+        }
+    };
+    root.addEventListener("mousedown", onMouseDown);
+    return () => root.removeEventListener("mousedown", onMouseDown);
 }
 
 // --- Editor bootstrap + host bridge wiring ---
@@ -1176,6 +1419,17 @@ const blockToolbar = document.getElementById("block-toolbar") as HTMLElement;
 
 editor.setRootElement(rootElement);
 
+// Remember the caret when focus leaves the editor (clicking a sidebar image, or
+// the native code-language picker) so the host callback lands where the cursor was.
+rootElement.addEventListener("blur", () => {
+    editor.getEditorState().read(() => {
+        const selection = $getSelection();
+        if (selection) {
+            savedSelection = selection.clone();
+        }
+    });
+});
+
 mergeRegister(
     registerRichText(editor),
     registerHistory(editor, createEmptyHistoryState(), 300),
@@ -1189,6 +1443,8 @@ mergeRegister(
     registerBlockToolbar(editor, blockToolbar),
     registerToolbar(editor),
     registerBlockRemove(editor, appElement),
+    registerDecoratorSelection(editor),
+    registerTableClickGuard(editor),
 );
 
 // Placeholder visibility — shown only for a truly empty document.
@@ -1203,10 +1459,13 @@ function currentMarkdown(): string {
     });
 }
 
-// Guarantee the document always has at least one editable block.
-function ensureParagraph(): void {
+// Guarantee the document ends with a paragraph (and so is never empty), so there
+// is always an empty block to type into after a table / image / divider / code
+// block. Must run inside an editor update.
+function ensureTrailingParagraph(): void {
     const root = $getRoot();
-    if (root.getChildrenSize() === 0) {
+    const last = root.getLastChild();
+    if (last === null || !$isParagraphNode(last)) {
         root.append($createParagraphNode());
     }
 }
@@ -1232,6 +1491,18 @@ editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
     scheduleSave();
 });
 
+// Re-assert the trailing paragraph after block edits (e.g. inserting a table or
+// deleting the last block). The append converges — once the last node is a
+// paragraph the inner update makes no change and doesn't re-fire.
+editor.registerUpdateListener(({ dirtyElements }) => {
+    if (loading || dirtyElements.size === 0) {
+        return;
+    }
+    editor.update(() => {
+        ensureTrailingParagraph();
+    });
+});
+
 // --- Host bridge: inbound calls from the host ---
 // (macfolioSetLink is registered by the selection toolbar, which owns the
 // selection it needs to restore.)
@@ -1242,7 +1513,9 @@ window.macfolioLoad = (markdown) => {
     editor.update(
         () => {
             $convertFromMarkdownString(markdown ?? "", MARKDOWN_TRANSFORMERS);
-            ensureParagraph();
+            ensureTrailingParagraph();
+            // Start the caret in the last (trailing) paragraph, ready to write.
+            $getRoot().selectEnd();
         },
         { tag: "history-merge" },
     );
@@ -1259,13 +1532,28 @@ window.macfolioSetEditable = (on) => {
     editor.setEditable(on);
 };
 
-// Insert a table at the caret with the dimensions from the host's dialog.
+// Resize the caret's table to the dialog's dimensions, or insert a new one.
 window.macfolioInsertTable = (rows, cols) => {
+    let resized = false;
     editor.update(() => {
-        if ($getSelection() == null) {
+        if (savedSelection) {
+            $setSelection(savedSelection.clone());
+        }
+        const selection = $getSelection();
+        const table = $isRangeSelection(selection)
+            ? $findMatchingParent(selection.anchor.getNode(), $isTableNode)
+            : null;
+        if ($isTableNode(table)) {
+            resizeTable(table, rows, cols);
+            resized = true;
+        } else if ($getSelection() == null) {
             $getRoot().selectEnd();
         }
     });
+    savedSelection = null;
+    if (resized) {
+        return;
+    }
     editor.dispatchCommand(INSERT_TABLE_COMMAND, {
         columns: String(cols),
         rows: String(rows),
@@ -1273,18 +1561,66 @@ window.macfolioInsertTable = (rows, cols) => {
     });
 };
 
-// Insert an image (path relative to the .md file) picked in the host dialog.
-window.macfolioInsertImage = (src, alt) => {
+// Swap a selected image's source/alt, or insert one into the caret's empty
+// paragraph (so images land in a deliberate empty block, never mid-text). Paths
+// are relative to the .md file.
+window.macfolioSetImage = (src, alt) => {
     editor.update(() => {
+        if (savedSelection) {
+            $setSelection(savedSelection.clone());
+        }
+        const selection = $getSelection();
+        // Editing the selected image.
+        if ($isNodeSelection(selection)) {
+            const node = selection.getNodes().find($isImageNode);
+            if ($isImageNode(node)) {
+                node.replace($createImageNode(src, alt));
+                return;
+            }
+        }
+        // Inserting into an empty paragraph.
+        if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
+            return;
+        }
+        const block = selection.anchor.getNode().getTopLevelElement();
+        if (!$isParagraphNode(block) || block.getTextContentSize() !== 0) {
+            return;
+        }
+        const image = $createImageNode(src, alt);
+        block.replace(image);
+        const nodeSelection = $createNodeSelection();
+        nodeSelection.add(image.getKey());
+        $setSelection(nodeSelection);
+    });
+    savedSelection = null;
+};
+
+// Set the language of the caret's code block, or turn its block into a new code
+// block in the picked language (empty language = plain).
+window.macfolioInsertCodeBlock = (language) => {
+    editor.update(() => {
+        if (savedSelection) {
+            $setSelection(savedSelection.clone());
+        }
         let selection = $getSelection();
-        if (selection == null) {
+        const block = $isRangeSelection(selection)
+            ? selection.anchor.getNode().getTopLevelElement()
+            : null;
+        if ($isCodeNode(block)) {
+            block.setLanguage(language || "");
+            return;
+        }
+        if (!$isRangeSelection(selection)) {
             $getRoot().selectEnd();
             selection = $getSelection();
         }
         if ($isRangeSelection(selection)) {
-            selection.insertNodes([$createImageNode(src, alt)]);
+            $setBlocksType(selection, () =>
+                $createCodeNode(language || undefined),
+            );
         }
     });
+    savedSelection = null;
 };
 
 // --- Start ---
@@ -1297,7 +1633,7 @@ document.addEventListener("contextmenu", (e) => {
 // Start with an empty document, then signal readiness to Swift.
 editor.update(
     () => {
-        ensureParagraph();
+        ensureTrailingParagraph();
     },
     {
         tag: "history-merge",

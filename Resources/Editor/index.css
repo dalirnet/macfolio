@@ -116,7 +116,7 @@ body {
 #editor-shell {
     position: relative;
     min-height: 100%;
-    padding: 15px 90px; /* more side padding, less top/bottom */
+    padding: 15px 56px; /* more side padding, less top/bottom */
     box-sizing: border-box;
 }
 
@@ -133,7 +133,7 @@ body {
 #placeholder {
     position: absolute;
     top: 15px;
-    inset-inline-start: 90px;
+    inset-inline-start: 56px;
     color: var(--mf-muted);
     font-size: 16px;
     line-height: 1.72;
@@ -161,7 +161,7 @@ body {
 }
 
 .mf-p {
-    margin: 0.7em 0;
+    margin: 1.5em 0;
 }
 
 .mf-h1 {
@@ -217,17 +217,32 @@ body {
     list-style: none;
 }
 
-/* Divider (horizontal rule). */
+/* Divider. A tall clickable block (a div, not <hr>) with the 1px rule centered via
+   the background, so it selects as a block with no caret on it. */
 .mf-hr {
-    border: none;
-    border-top: 1px solid var(--mf-outline);
-    margin: 1.4em 0;
+    height: 24px;
+    margin: 1em 0;
+    cursor: pointer;
+    user-select: none;
+    background: linear-gradient(var(--mf-outline), var(--mf-outline)) center /
+        100% 1px no-repeat;
 }
 
-/* Image — served for display via the host's mfmedia:// scheme handler. */
+/* Image — a block of its own (no caret beside it); served via mfmedia://. The
+   figure shrinks to the image so the caption centers under the image, not the
+   whole line. */
 .mf-image {
-    display: inline-block;
+    display: block;
+    width: fit-content;
     max-width: 100%;
+    margin: 0.4em 0;
+}
+
+.mf-image-alt {
+    color: var(--mf-muted);
+    font-size: 0.85em;
+    text-align: center;
+    margin-top: 0.3em;
 }
 
 .mf-image img {
@@ -244,7 +259,7 @@ body {
     font-size: 0.9em;
 }
 
-/* Remove button — hover a table / image / divider to delete it. */
+/* Remove button — shown in the gutter of the focused block; click to delete it. */
 .mf-remove-btn {
     position: fixed;
     z-index: 60;
@@ -406,13 +421,20 @@ body {
     z-index: 50;
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 2px;
-    padding: 6px 90px;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 56px;
     background: color-mix(in srgb, var(--mf-surface), transparent 18%);
     -webkit-backdrop-filter: blur(24px) saturate(1.8);
     backdrop-filter: blur(24px) saturate(1.8);
     border-bottom: 0.5px solid color-mix(in srgb, var(--mf-fg), transparent 88%);
+}
+
+.mf-toolbar-side {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px;
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -444,8 +466,20 @@ body {
     transition: background 0.15s ease;
 }
 
-.mf-block-btn:hover {
+.mf-block-btn:hover:not(:disabled) {
     background: var(--mf-hover);
+}
+
+.mf-block-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+/* Lit up while the caret is in this block type (image / table / code) — the same
+   filled look as the selection toolbar's active link button. */
+.mf-block-btn--active {
+    background: var(--mf-selected);
+    color: var(--mf-accent);
 }
 
 .mf-block-btn svg {
