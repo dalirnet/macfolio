@@ -1,0 +1,527 @@
+@font-face {
+    font-family: "IRANSansX";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("../Fonts/IRANSansXNoEn-Regular.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: "IRANSansX";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("../Fonts/IRANSansXNoEn-Bold.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: "Sofia Sans";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("../Fonts/SofiaSans.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: "Inconsolata";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("../Fonts/Inconsolata.ttf") format("truetype");
+}
+
+/* Palette — Latin first, Persian falls through to IRANSansX. Surface is
+   transparent so the app window shows through the WebView. */
+:root {
+    --mf-font-default:
+        "Sofia Sans", "IRANSansX", ui-sans-serif, system-ui, sans-serif,
+        "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+        "Noto Color Emoji";
+    --mf-font-code:
+        "Inconsolata", "IRANSansX", ui-monospace, SFMono-Regular, Menlo, Monaco,
+        Consolas, "Liberation Mono", "Courier New", monospace;
+
+    --mf-fg: #1c1c1e;
+    --mf-muted: #8a8a8e;
+    --mf-surface: #ffffff;
+    --mf-hover: rgba(0, 0, 0, 0.06);
+    --mf-selected: rgba(0, 0, 0, 0.1);
+    --mf-outline: rgba(0, 0, 0, 0.14);
+    --mf-accent: #2f6bff;
+    --mf-inline-code-fg: #c7254e;
+    --mf-inline-code-bg: rgba(0, 0, 0, 0.05);
+    --mf-code-bg: #f6f6f7;
+    --mf-quote-bar: rgba(0, 0, 0, 0.22);
+
+    /* syntax tokens */
+    --mf-tok-comment: #8a8a8e;
+    --mf-tok-keyword: #ad3da4;
+    --mf-tok-string: #c41a16;
+    --mf-tok-const: #1c00cf;
+    --mf-tok-fn: #326d74;
+    --mf-tok-class: #3900a0;
+    --mf-tok-builtin: #0f68a0;
+    --mf-tok-attr: #836c28;
+    --mf-tok-op: #5c6773;
+    --mf-tok-var: #1c1c1e;
+    --mf-tok-punct: #5c6773;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --mf-fg: #e6e6e6;
+        --mf-muted: #7d7d7d;
+        --mf-surface: #1c1c1c;
+        --mf-hover: rgba(255, 255, 255, 0.07);
+        --mf-selected: rgba(255, 255, 255, 0.12);
+        --mf-outline: rgba(255, 255, 255, 0.14);
+        --mf-accent: #6f9bff;
+        --mf-inline-code-fg: #ff6b6b;
+        --mf-inline-code-bg: rgba(255, 255, 255, 0.08);
+        --mf-code-bg: #161616;
+        --mf-quote-bar: rgba(255, 255, 255, 0.24);
+
+        --mf-tok-comment: #6f6f6f;
+        --mf-tok-keyword: #ff7ab2;
+        --mf-tok-string: #ff8170;
+        --mf-tok-const: #d0bf69;
+        --mf-tok-fn: #78c2b3;
+        --mf-tok-class: #dabaff;
+        --mf-tok-builtin: #6bb0ff;
+        --mf-tok-attr: #d9c97c;
+        --mf-tok-op: #b3bcc6;
+        --mf-tok-var: #e6e6e6;
+        --mf-tok-punct: #b3bcc6;
+    }
+}
+
+/* Layout — fill height via min-height only. */
+html,
+body {
+    margin: 0;
+    height: 100%;
+}
+
+body {
+    color: var(--mf-fg);
+    font-family: var(--mf-font-default);
+    background: transparent;
+}
+
+#app {
+    height: 100%;
+    overflow: auto;
+}
+
+#editor-shell {
+    position: relative;
+    min-height: 100%;
+    padding: 15px 90px; /* more side padding, less top/bottom */
+    box-sizing: border-box;
+}
+
+#editor {
+    outline: none;
+    min-height: 100%;
+    font-size: 16px;
+    line-height: 1.72;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* Placeholder — overlays the first line; JS toggles display when empty. */
+#placeholder {
+    position: absolute;
+    top: 15px;
+    inset-inline-start: 90px;
+    color: var(--mf-muted);
+    font-size: 16px;
+    line-height: 1.72;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Blocks — text-align:start pairs with dir="auto" so each block aligns to its
+   own reading direction (RTL right, LTR left). */
+#editor .mf-p,
+#editor .mf-h1,
+#editor .mf-h2,
+#editor .mf-h3,
+#editor .mf-h4,
+#editor .mf-h5,
+#editor .mf-h6,
+#editor .mf-quote,
+#editor .mf-ul,
+#editor .mf-ol {
+    text-align: start;
+}
+
+#editor > :first-child {
+    margin-top: 0;
+}
+
+.mf-p {
+    margin: 0.7em 0;
+}
+
+.mf-h1 {
+    font-size: 1.85em;
+    font-weight: 700;
+    letter-spacing: -0.021em;
+    line-height: 1.2;
+    margin: 1.3em 0 0.4em;
+}
+
+.mf-h2 {
+    font-size: 1.42em;
+    font-weight: 700;
+    letter-spacing: -0.016em;
+    line-height: 1.25;
+    margin: 1.25em 0 0.35em;
+}
+
+.mf-h3 {
+    font-size: 1.18em;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 1.15em 0 0.3em;
+}
+
+.mf-h4,
+.mf-h5,
+.mf-h6 {
+    font-weight: 600;
+    margin: 1.1em 0 0.3em;
+}
+
+/* Quote — accent bar on the reading-start side (flips with direction). */
+.mf-quote {
+    margin: 0.8em 0;
+    padding-inline-start: 1em;
+    border-inline-start: 3px solid var(--mf-quote-bar);
+    color: var(--mf-muted);
+}
+
+/* Lists — native markers already respect dir="auto". */
+.mf-ul,
+.mf-ol {
+    margin: 0.6em 0;
+    padding-inline-start: 1.6em;
+}
+
+.mf-li {
+    margin: 0.2em 0;
+}
+
+.mf-nested-li {
+    list-style: none;
+}
+
+/* Divider (horizontal rule). */
+.mf-hr {
+    border: none;
+    border-top: 1px solid var(--mf-outline);
+    margin: 1.4em 0;
+}
+
+/* Image — served for display via the host's mfmedia:// scheme handler. */
+.mf-image {
+    display: inline-block;
+    max-width: 100%;
+}
+
+.mf-image img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    vertical-align: middle;
+}
+
+/* Broken/unresolved image: show the alt text instead of a torn-image glyph. */
+.mf-image img::before {
+    content: attr(alt);
+    color: var(--mf-muted);
+    font-size: 0.9em;
+}
+
+/* Remove button — hover a table / image / divider to delete it. */
+.mf-remove-btn {
+    position: fixed;
+    z-index: 60;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0.5px solid color-mix(in srgb, var(--mf-fg), transparent 86%);
+    border-radius: 50%;
+    background: var(--mf-surface);
+    color: var(--mf-fg);
+    cursor: pointer;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
+}
+
+.mf-remove-btn--visible {
+    display: inline-flex;
+}
+
+.mf-remove-btn:hover {
+    background: var(--mf-selected);
+}
+
+.mf-remove-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* Table — GFM. Column order follows the table's dir="auto"; each cell's text
+   bidi-auto via unicode-bidi:plaintext, so Persian cells right-align on their own. */
+.mf-table {
+    border-collapse: collapse;
+    margin: 0.9em 0;
+    width: auto;
+    table-layout: fixed;
+    overflow: hidden;
+}
+
+/* An RTL table is a shrink-to-fit box in an LTR root; push it to the right. */
+.mf-table[dir="rtl"] {
+    margin-left: auto;
+    margin-right: 0;
+}
+
+.mf-td,
+.mf-th {
+    border: 1px solid var(--mf-outline);
+    padding: 6px 10px;
+    min-width: 5em;
+    vertical-align: top;
+}
+
+.mf-th {
+    background: var(--mf-hover);
+    font-weight: 600;
+}
+
+.mf-table .mf-p {
+    margin: 0;
+    unicode-bidi: plaintext;
+    text-align: start;
+}
+
+/* Inline formatting. */
+.mf-bold {
+    font-weight: 700;
+}
+
+.mf-italic {
+    font-style: italic;
+}
+
+.mf-strike {
+    text-decoration: line-through;
+}
+
+.mf-inline-code {
+    font-family: var(--mf-font-code);
+    font-size: 0.92em;
+    color: var(--mf-inline-code-fg);
+    background: var(--mf-inline-code-bg);
+    padding: 0.12em 0.34em;
+    border-radius: 5px;
+    /* keep inline code left-to-right even inside an RTL block */
+    unicode-bidi: isolate;
+    direction: ltr;
+}
+
+.mf-link {
+    color: var(--mf-accent);
+    text-decoration: none;
+    cursor: text;
+}
+
+.mf-link:hover {
+    text-decoration: underline;
+}
+
+/* Code block — forced LTR (code reads left-to-right regardless of block dir). */
+.mf-code-block {
+    display: block;
+    font-family: var(--mf-font-code);
+    font-size: 0.9em;
+    line-height: 1.6;
+    background: var(--mf-code-bg);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 0.9em 0;
+    overflow-x: auto;
+    tab-size: 2;
+    direction: ltr;
+    text-align: left;
+    unicode-bidi: isolate;
+    white-space: pre-wrap;
+}
+
+/* syntax tokens */
+.mf-tok-comment {
+    color: var(--mf-tok-comment);
+    font-style: italic;
+}
+.mf-tok-keyword {
+    color: var(--mf-tok-keyword);
+}
+.mf-tok-string {
+    color: var(--mf-tok-string);
+}
+.mf-tok-const {
+    color: var(--mf-tok-const);
+}
+.mf-tok-fn {
+    color: var(--mf-tok-fn);
+}
+.mf-tok-class {
+    color: var(--mf-tok-class);
+}
+.mf-tok-builtin {
+    color: var(--mf-tok-builtin);
+}
+.mf-tok-attr {
+    color: var(--mf-tok-attr);
+}
+.mf-tok-op {
+    color: var(--mf-tok-op);
+}
+.mf-tok-var {
+    color: var(--mf-tok-var);
+}
+.mf-tok-punct {
+    color: var(--mf-tok-punct);
+}
+
+/* --- Sticky block toolbar — pinned to the top of the scroll area. --- */
+#block-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 6px 90px;
+    background: color-mix(in srgb, var(--mf-surface), transparent 18%);
+    -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    backdrop-filter: blur(24px) saturate(1.8);
+    border-bottom: 0.5px solid color-mix(in srgb, var(--mf-fg), transparent 88%);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    #block-toolbar {
+        background: var(--mf-surface);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}
+
+/* Dim + block the toolbar while the agent holds the editor read-only. */
+#block-toolbar.mf-block-toolbar--disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.mf-block-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--mf-fg);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.mf-block-btn:hover {
+    background: var(--mf-hover);
+}
+
+.mf-block-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.mf-block-sep {
+    width: 1px;
+    height: 20px;
+    margin: 0 6px;
+    background: var(--mf-outline);
+}
+
+/* --- Floating selection toolbar — macOS "Liquid Glass" (translucent). --- */
+.mf-toolbar {
+    position: fixed;
+    z-index: 1000;
+    display: none;
+    padding: 3px;
+    border-radius: 12px;
+    align-items: center;
+    background: color-mix(in srgb, var(--mf-surface), transparent 28%);
+    -webkit-backdrop-filter: blur(28px) saturate(1.8);
+    backdrop-filter: blur(28px) saturate(1.8);
+    border: 0.5px solid color-mix(in srgb, var(--mf-fg), transparent 86%);
+    box-shadow:
+        0 14px 44px rgba(0, 0, 0, 0.3),
+        0 0 0 0.5px rgba(0, 0, 0, 0.04),
+        inset 0 0.5px 0 rgba(255, 255, 255, 0.14);
+}
+
+.mf-toolbar--visible {
+    display: flex;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .mf-toolbar {
+        background: var(--mf-surface);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}
+
+.mf-toolbar-item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin: 3px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--mf-fg);
+    cursor: pointer;
+}
+
+.mf-toolbar-item:hover {
+    background: var(--mf-hover);
+}
+
+.mf-toolbar-item.mf-active {
+    background: var(--mf-selected);
+    color: var(--mf-accent);
+}
+
+.mf-toolbar-item svg {
+    width: 16px;
+    height: 16px;
+}
+
+.mf-toolbar-divider {
+    width: 1px;
+    height: 18px;
+    margin: 6px 2px;
+    background: var(--mf-outline);
+}
