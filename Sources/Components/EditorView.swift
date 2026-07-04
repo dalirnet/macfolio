@@ -54,6 +54,7 @@ struct EditorView: NSViewRepresentable {
         webView.setValue(false, forKey: "drawsBackground")
         webView.autoresizingMask = [.width, .height]  // fill the container (fullscreen, resize)
         coordinator.webView = webView
+        coordinator.observeAccent()  // keep the editor's --mf-accent on the macOS accent
 
         // Allow Safari's Web Inspector to attach (Develop ▸ <app> ▸ index.html).
         if #available(macOS 13.3, *) {
@@ -99,8 +100,14 @@ struct EditorView: NSViewRepresentable {
         var fileURL: URL?
         var projectRoot: URL?
         var bottomInset: CGFloat = 0
+        private var accentObserver: NSObjectProtocol?
+        private var appearanceObservation: NSKeyValueObservation?
 
         init(onSave: @escaping (String) -> Void) { self.onSave = onSave }
+
+        deinit {
+            if let accentObserver { NotificationCenter.default.removeObserver(accentObserver) }
+        }
 
         // MARK: - JS → Swift
 
@@ -112,6 +119,7 @@ struct EditorView: NSViewRepresentable {
                 ready = true
                 pushDocIfReady()
                 applyBottomInset()
+                applyAccent()
             case "save":
                 if let markdown = message.body as? String { onSave(markdown) }
             case "log":
@@ -162,6 +170,39 @@ struct EditorView: NSViewRepresentable {
 
         func evaluate(_ script: String) {
             webView?.evaluateJavaScript(script)
+        }
+
+        // MARK: - Accent color (follow the macOS system accent)
+
+        // Re-push the accent when the user changes it (systemColorsDidChange) or the
+        // editor's light/dark appearance flips (controlAccentColor resolves per
+        // appearance). KVO on effectiveAppearance auto-invalidates when released.
+        func observeAccent() {
+            accentObserver = NotificationCenter.default.addObserver(
+                forName: NSColor.systemColorsDidChangeNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                self?.applyAccent()
+            }
+            appearanceObservation = webView?.observe(\.effectiveAppearance) { [weak self] _, _ in
+                self?.applyAccent()
+            }
+        }
+
+        // Override the editor's --mf-accent with the resolved macOS accent color, so
+        // links / the block bar / selection UI match the rest of the app.
+        func applyAccent() {
+            guard ready, let webView else { return }
+            var rgb = (r: 0, g: 0, b: 0)
+            webView.effectiveAppearance.performAsCurrentDrawingAppearance {
+                if let color = NSColor.controlAccentColor.usingColorSpace(.sRGB) {
+                    rgb.r = Int((color.redComponent * 255).rounded())
+                    rgb.g = Int((color.greenComponent * 255).rounded())
+                    rgb.b = Int((color.blueComponent * 255).rounded())
+                }
+            }
+            evaluate(
+                "document.documentElement.style"
+                    + ".setProperty('--mf-accent','rgb(\(rgb.r),\(rgb.g),\(rgb.b))');")
         }
 
         // MARK: - Editor prompts (native alerts, labelled like Settings)
