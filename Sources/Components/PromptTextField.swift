@@ -33,7 +33,7 @@ struct PromptTextField: NSViewRepresentable {
         textView.backgroundColor = .clear
         textView.font = font
         textView.textColor = .labelColor
-        textView.insertionPointColor = NSColor(Theme.primary)
+        textView.insertionPointColor = .controlAccentColor
         textView.textContainerInset = NSSize(width: 0, height: 2)
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
@@ -150,13 +150,25 @@ final class PromptTextView: NSTextView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         guard string.isEmpty, !placeholder.isEmpty else { return }
+        let font = placeholderFont ?? self.font ?? NSFont.systemFont(ofSize: 12)
+        // Pin the placeholder to the same line height as typed text, so it lands
+        // at the same vertical position instead of sitting higher (typed text
+        // uses a taller pinned line height — see PromptTextField.applyDirection).
+        let style = NSMutableParagraphStyle()
+        let lineHeight = Theme.lineHeight(font.pointSize)
+        style.minimumLineHeight = lineHeight
+        style.maximumLineHeight = lineHeight
         let attributes: [NSAttributedString.Key: Any] = [
             .foregroundColor: NSColor.placeholderTextColor,
-            .font: placeholderFont ?? font ?? NSFont.systemFont(ofSize: 12),
+            .font: font,
+            .paragraphStyle: style,
         ]
-        let origin = NSPoint(
-            x: textContainerInset.width + (textContainer?.lineFragmentPadding ?? 0),
-            y: textContainerInset.height)
-        placeholder.draw(at: origin, withAttributes: attributes)
+        let padding = textContainer?.lineFragmentPadding ?? 0
+        let rect = NSRect(
+            x: textContainerInset.width + padding,
+            y: textContainerInset.height,
+            width: max(0, bounds.width - textContainerInset.width - padding),
+            height: max(0, bounds.height - textContainerInset.height))
+        placeholder.draw(in: rect, withAttributes: attributes)
     }
 }

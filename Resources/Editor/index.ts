@@ -594,7 +594,7 @@ const IMAGE_TRANSFORMER: ElementTransformer = {
 };
 
 // Single source of truth for Markdown <-> editor conversion, used by both the
-// load/save round-trip and the live typing shortcuts (`# `, `- `, ``` ``` ```, …).
+// load/save round-trip and the live typing shortcuts (`# `, `- `, ``` ``` ```, etc.).
 // Custom transformers come first so they win over the defaults (e.g. `|...|`).
 const MARKDOWN_TRANSFORMERS: Array<Transformer> = [
     TABLE_TRANSFORMER,

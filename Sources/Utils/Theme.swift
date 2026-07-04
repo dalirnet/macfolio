@@ -1,11 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// App accent + shared visual constants.
+/// Shared fonts + visual constants. The accent comes from the macOS system
+/// accent color (`Color.accentColor` / `NSColor.controlAccentColor`).
 enum Theme {
-    /// Macfolio's accent — ink indigo.
-    static let primary = Color(red: 0.36, green: 0.36, blue: 0.86)
-
     /// The Persian fallback font family (Dana NonEnglish variant).
     private static let persianFallback = "DanaNoEn"
 

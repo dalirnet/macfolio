@@ -293,11 +293,15 @@ body {
 /* Table — GFM. Column order follows the table's dir="auto"; each cell's text
    bidi-auto via unicode-bidi:plaintext, so Persian cells right-align on their own. */
 .mf-table {
-    border-collapse: collapse;
+    /* separate (not collapse) so the table's own border can round the corners.
+       The table draws the outer ring; cells draw the interior grid. */
+    border-collapse: separate;
+    border-spacing: 0;
     margin: 0.9em 0;
     width: auto;
     table-layout: fixed;
-    overflow: hidden;
+    border: 1px solid var(--mf-outline);
+    border-radius: 8px;
 }
 
 /* An RTL table is a shrink-to-fit box in an LTR root; push it to the right. */
@@ -306,12 +310,87 @@ body {
     margin-right: 0;
 }
 
+/* Interior grid: right + bottom on every cell (physical, so direction doesn't
+   matter for the lines themselves). The table border owns the outer edges, so
+   drop the cell border that would double it — bottom on the last row, and the
+   right on the outer-right column (last cell in LTR, first cell in RTL). */
 .mf-td,
 .mf-th {
-    border: 1px solid var(--mf-outline);
+    border-right: 1px solid var(--mf-outline);
+    border-bottom: 1px solid var(--mf-outline);
     padding: 6px 10px;
     min-width: 5em;
     vertical-align: top;
+    overflow: hidden; /* clip the cell's own background to its rounded corner */
+}
+
+.mf-table tr:last-of-type > td,
+.mf-table tr:last-of-type > th {
+    border-bottom: 0;
+}
+
+.mf-table tr > td:last-child,
+.mf-table tr > th:last-child {
+    border-right: 0;
+}
+
+.mf-table[dir="rtl"] tr > td:last-child,
+.mf-table[dir="rtl"] tr > th:last-child {
+    border-right: 1px solid var(--mf-outline);
+}
+
+.mf-table[dir="rtl"] tr > td:first-child,
+.mf-table[dir="rtl"] tr > th:first-child {
+    border-right: 0;
+}
+
+/* Round the four corner cells so their backgrounds (e.g. the th fill) clip to
+   the table's rounded corners. Physical radii with an explicit RTL swap — the
+   cells use dir="auto", so logical radii can't be trusted here. Rows sit after
+   the <colgroup>, so target the first/last <tr> with :*-of-type. */
+.mf-table tr:first-of-type > td:first-child,
+.mf-table tr:first-of-type > th:first-child {
+    border-top-left-radius: 8px;
+}
+
+.mf-table tr:first-of-type > td:last-child,
+.mf-table tr:first-of-type > th:last-child {
+    border-top-right-radius: 8px;
+}
+
+.mf-table tr:last-of-type > td:first-child,
+.mf-table tr:last-of-type > th:first-child {
+    border-bottom-left-radius: 8px;
+}
+
+.mf-table tr:last-of-type > td:last-child,
+.mf-table tr:last-of-type > th:last-child {
+    border-bottom-right-radius: 8px;
+}
+
+/* RTL: the first cell is on the right, the last on the left — mirror the radii. */
+.mf-table[dir="rtl"] tr:first-of-type > td:first-child,
+.mf-table[dir="rtl"] tr:first-of-type > th:first-child {
+    border-top-left-radius: 0;
+    border-top-right-radius: 8px;
+}
+
+.mf-table[dir="rtl"] tr:first-of-type > td:last-child,
+.mf-table[dir="rtl"] tr:first-of-type > th:last-child {
+    border-top-right-radius: 0;
+    border-top-left-radius: 8px;
+}
+
+.mf-table[dir="rtl"] tr:last-of-type > td:first-child,
+.mf-table[dir="rtl"] tr:last-of-type > th:first-child {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 8px;
+}
+
+.mf-table[dir="rtl"] tr:last-of-type > td:last-child,
+.mf-table[dir="rtl"] tr:last-of-type > th:last-child {
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 8px;
 }
 
 .mf-th {

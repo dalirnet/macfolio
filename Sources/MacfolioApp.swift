@@ -24,13 +24,12 @@ struct MacfolioApp: App {
                 }
             }
             .frame(minWidth: AppWindow.width, minHeight: AppWindow.height)
-            .tint(Theme.primary)
             .environment(\.font, Theme.ui(13))
             .onAppear(perform: checkAccess)
         }
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("New Project…") {
+                Button("New Project") {
                     NotificationCenter.default.post(name: .newProject, object: nil)
                 }
                 .keyboardShortcut("n", modifiers: [.command, .shift])

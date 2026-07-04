@@ -42,7 +42,8 @@ struct MainView: View {
                 Button {
                     promptOpen.toggle()
                 } label: {
-                    Image(systemName: promptOpen ? "sparkles" : "sparkle")
+                    Image(systemName: "sparkle")
+                        .foregroundStyle(promptOpen ? Color.accentColor : Color.primary)
                 }
                 Button {
                     SettingsDialog.present()
@@ -150,7 +151,7 @@ struct MainView: View {
         }
         // Background context menu (empty sidebar area) → new project.
         .contextMenu {
-            Button("New Project…") { startNewProject() }
+            Button("New Project") { startNewProject() }
         }
     }
 

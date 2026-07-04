@@ -146,7 +146,7 @@ enum MarkdownBlock {
                 continue
             }
 
-            // Fenced code block: ``` … ```
+            // Fenced code block: ``` ... ```
             if t.hasPrefix("```") {
                 var body: [String] = []
                 i += 1
@@ -166,7 +166,7 @@ enum MarkdownBlock {
                 continue
             }
 
-            // ATX heading: # … ######
+            // ATX heading: # ... ######
             if let heading = Self.heading(t) {
                 blocks.append(heading)
                 i += 1

@@ -2,15 +2,14 @@ import AppKit
 import SwiftUI
 
 extension View {
-    /// Show the text (I-beam) cursor over the whole area, not just the glyphs —
-    /// so the padding around the field reads as an input, not a button.
-    func textCursorOnHover() -> some View {
-        onContinuousHover { phase in
-            switch phase {
-            case .active: NSCursor.iBeam.set()
-            case .ended: NSCursor.arrow.set()
-            }
-        }
+    /// The prompt row's inset field look: a solid rounded field with inner
+    /// padding, sitting inside the bar. No border.
+    func promptFieldStyle() -> some View {
+        frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -32,13 +31,13 @@ struct AIPromptBar: View {
     @State private var inputHeight: CGFloat = AIPromptBar.rowHeight
     /// Measured height of the reply, so its box grows with content (up to a cap).
     @State private var responseHeight: CGFloat = 0
-    /// Bumped to pull focus into the field (tapping its padding, not just glyphs).
+    /// Bumped to pull focus into the field (e.g. tapping the row's padding).
     @State private var focusToken = 0
 
     /// Cap the reply box; beyond this it scrolls.
     private let maxResponseHeight: CGFloat = 200
-    /// One-line height of the prompt (pinned line height + text-view insets),
-    /// shared by the field's minimum and the status row so nothing jumps.
+    /// One-line height of the prompt (pinned line height + text-view insets), used
+    /// as the row's minimum so the input and the working status are the same size.
     static let rowHeight: CGFloat = Theme.lineHeight(12.5) + 4
 
     var body: some View {
@@ -47,15 +46,11 @@ struct AIPromptBar: View {
                 response(reply)
                 divider
             }
-            // The prompt row itself: the live status while a turn runs, else the
-            // editable input — status sits *on* the prompt, not stacked above it.
-            if chat.working {
-                status
-            } else {
-                input
-            }
+            promptRow
         }
-        .frame(maxWidth: 600)
+        // Responsive: span the editor's width (with the side margins below)
+        // rather than a fixed cap, so the bar follows the window as it resizes.
+        .frame(maxWidth: .infinity)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         .overlay(
             // Adaptive hairline so the edge reads in both light and dark, not
@@ -82,52 +77,68 @@ struct AIPromptBar: View {
         Divider().opacity(0.5)
     }
 
-    // MARK: - Input (always docked at the bottom)
+    // MARK: - Prompt row (leading icon + input / status)
 
-    private var input: some View {
-        // NSTextView-backed so Persian/Arabic type right-to-left naturally (see
-        // PromptTextField). No send button — Return submits — so the layout stays
-        // neutral for both directions.
-        PromptTextField(
-            text: $draft,
-            height: $inputHeight,
-            placeholder: "ask claude…",
-            isEnabled: !(disabled || chat.working),
-            font: Theme.nsUI(12.5),
-            minHeight: AIPromptBar.rowHeight,
-            maxHeight: 96,
-            focusToken: focusToken,
-            onSubmit: submit
-        )
-        .frame(maxWidth: .infinity)
-        .frame(height: inputHeight)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+    private var promptRow: some View {
+        HStack(spacing: 8) {
+            leadingIcon
+            if chat.working {
+                // Live status — no spinner prefix; the leading icon carries it.
+                Text(chat.activity.last ?? "thinking")
+                    .font(Theme.mono(11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .id(chat.activity.last)
+                    .transition(.opacity)
+            } else {
+                // NSTextView-backed so Persian/Arabic type right-to-left naturally.
+                PromptTextField(
+                    text: $draft,
+                    height: $inputHeight,
+                    placeholder: "Ask AI",
+                    isEnabled: !disabled,
+                    font: Theme.nsUI(12.5),
+                    minHeight: AIPromptBar.rowHeight,
+                    maxHeight: 96,
+                    focusToken: focusToken,
+                    onSubmit: submit
+                )
+                .frame(height: inputHeight)
+            }
+        }
+        .frame(minHeight: AIPromptBar.rowHeight)
+        .promptFieldStyle()
         .contentShape(Rectangle())
-        .onTapGesture { focusToken += 1 }
-        .textCursorOnHover()
+        .onTapGesture { if !chat.working { focusToken += 1 } }
+        .animation(.easeInOut(duration: 0.15), value: chat.activity.last)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 
-    // MARK: - Status (while a turn runs)
-
-    private var status: some View {
-        HStack(spacing: 8) {
-            ProgressView().controlSize(.small).tint(Theme.primary)
-            Text(chat.activity.last ?? "thinking…")
-                .font(Theme.mono(11))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .id(chat.activity.last)
-                .transition(.opacity)
+    /// Leading indicator: a sparkle "send" button when idle (submits; dimmed when
+    /// empty), a spinner while a turn runs. Fixed slot so the row doesn't shift.
+    private var leadingIcon: some View {
+        Group {
+            if chat.working {
+                ProgressView().controlSize(.small).tint(.accentColor)
+            } else {
+                Button(action: submit) {
+                    Image(systemName: "sparkle")
+                        .font(.system(size: 14))
+                        .foregroundStyle(canSubmit ? Color.accentColor : Color.secondary)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSubmit)
+                .help("Ask AI")
+            }
         }
-        // Match the input's single-line height so swapping input↔status doesn't
-        // change the row height (no vertical blink on submit/finish).
-        .frame(minHeight: AIPromptBar.rowHeight)
-        .animation(.easeInOut(duration: 0.15), value: chat.activity.last)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .frame(width: 18, height: 18)
+    }
+
+    private var canSubmit: Bool {
+        !disabled && !trimmed.isEmpty
     }
 
     // MARK: - Response
@@ -153,8 +164,9 @@ struct AIPromptBar: View {
         }
         .frame(height: min(responseHeight, maxResponseHeight))
         .onPreferenceChange(ResponseHeightKey.self) { responseHeight = $0 }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 4)
     }
 
     // MARK: - Actions

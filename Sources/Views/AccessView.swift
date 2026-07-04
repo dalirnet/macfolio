@@ -19,11 +19,11 @@ struct AccessView: View {
         VStack(spacing: 20) {
             ZStack {
                 Circle()
-                    .fill(Theme.primary.opacity(0.10))
+                    .fill(Color.accentColor.opacity(0.10))
                     .frame(width: 96, height: 96)
                     .scaleEffect(pulse)
                 Circle()
-                    .fill(Theme.primary.opacity(0.06))
+                    .fill(Color.accentColor.opacity(0.06))
                     .frame(width: 72, height: 72)
                     .scaleEffect(pulse * 0.97)
                 iconView
@@ -63,11 +63,11 @@ struct AccessView: View {
         case .available:
             Image(systemName: "checkmark")
                 .font(.system(size: 30, weight: .semibold))
-                .foregroundColor(Theme.primary)
+                .foregroundColor(.accentColor)
         case .unavailable:
             Image(systemName: "terminal")
                 .font(.system(size: 26, weight: .semibold))
-                .foregroundColor(Theme.primary)
+                .foregroundColor(.accentColor)
         }
     }
 

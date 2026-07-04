@@ -136,9 +136,9 @@ final class ClaudeService {
         let path = (input["file_path"] as? String).map { relative($0, to: project) }
 
         switch name {
-        case "Read": return "reading \(path ?? "…")"
-        case "Write": return "writing \(path ?? "…")"
-        case "Edit", "MultiEdit": return "editing \(path ?? "…")"
+        case "Read": return "reading \(path ?? "file")"
+        case "Write": return "writing \(path ?? "file")"
+        case "Edit", "MultiEdit": return "editing \(path ?? "file")"
         case "Bash": return "run: \((input["command"] as? String ?? "").prefix(48))"
         case "Glob", "Grep": return "searching"
         case "TodoWrite": return "planning"
