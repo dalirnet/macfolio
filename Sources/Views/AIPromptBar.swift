@@ -44,7 +44,6 @@ struct AIPromptBar: View {
         VStack(spacing: 0) {
             if let reply = chat.reply, !chat.working {
                 response(reply)
-                divider
             }
             promptRow
         }
@@ -71,10 +70,6 @@ struct AIPromptBar: View {
         .animation(.easeInOut(duration: 0.2), value: chat.working)
         .animation(.easeInOut(duration: 0.2), value: chat.reply)
         .animation(.easeInOut(duration: 0.15), value: responseHeight)
-    }
-
-    private var divider: some View {
-        Divider().opacity(0.5)
     }
 
     // MARK: - Prompt row (leading icon + input / status)
@@ -148,25 +143,50 @@ struct AIPromptBar: View {
         // The box sizes to the content, capped at `maxResponseHeight` then scrolls.
         // No header/close button: type a new prompt below to move on.
         let rtl = Bidi.isRTL(text)
-        return ScrollView {
-            Text(text)
-                .font(Theme.ui(12.5))
-                .foregroundStyle(.primary)
-                .textSelection(.enabled)
-                .lineSpacing(3)
-                .multilineTextAlignment(rtl ? .trailing : .leading)
-                .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(key: ResponseHeightKey.self, value: geo.size.height)
-                    }
-                )
+        return VStack(alignment: .leading, spacing: 12) {
+            ScrollView {
+                Text(text)
+                    .font(Theme.ui(12.5))
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+                    .lineSpacing(3)
+                    .multilineTextAlignment(rtl ? .trailing : .leading)
+                    .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.preference(
+                                key: ResponseHeightKey.self, value: geo.size.height)
+                        }
+                    )
+            }
+            .frame(height: min(responseHeight, maxResponseHeight))
+            .onPreferenceChange(ResponseHeightKey.self) { responseHeight = $0 }
+
+            if let usage = chat.usage {
+                tokenUsage(usage)
+            }
         }
-        .frame(height: min(responseHeight, maxResponseHeight))
-        .onPreferenceChange(ResponseHeightKey.self) { responseHeight = $0 }
         .padding(.horizontal, 16)
         .padding(.top, 12)
-        .padding(.bottom, 4)
+    }
+
+    /// The turn's token usage: ↑ input (what you send to the agent), ↓ output
+    /// (what it sends back). Shown under the reply.
+    private func tokenUsage(_ usage: AgentUsage) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "arrow.up").font(.system(size: 8, weight: .bold))
+            Text(AIPromptBar.short(usage.inputTokens))
+            Image(systemName: "arrow.down").font(.system(size: 8, weight: .bold))
+                .padding(.leading, 8)
+            Text(AIPromptBar.short(usage.outputTokens))
+        }
+        .font(Theme.mono(10.5))
+        .foregroundStyle(.primary)
+    }
+
+    /// Compact token count: 1234 → "1.2k".
+    private static func short(_ n: Int) -> String {
+        n >= 1000 ? String(format: "%.1fk", Double(n) / 1000) : "\(n)"
     }
 
     // MARK: - Actions

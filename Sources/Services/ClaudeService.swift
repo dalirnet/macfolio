@@ -1,5 +1,14 @@
 import Foundation
 
+/// One turn's token usage, reported by the CLI's final `result` message.
+/// `inputTokens` is the *new* (uncached) input — it excludes the CLI's cached
+/// system prompt + tool schemas (~25k, sent every turn), which would otherwise
+/// dwarf the real usage.
+struct AgentUsage: Equatable {
+    var inputTokens: Int
+    var outputTokens: Int
+}
+
 /// Macfolio's single dependency: the Claude Code CLI.
 ///
 /// Macfolio *drives* Claude Code to write: it runs with tools enabled inside the
@@ -59,22 +68,25 @@ final class ClaudeService {
     // MARK: - Running a turn
 
     /// Run one agent turn inside the project folder, streaming per-step progress
-    /// (reading/writing files) via `onStep`. Returns the final reply and stores
-    /// the session id for the next turn. `onStep` is called off the main thread —
-    /// hop before touching UI.
+    /// (reading/writing files) via `onStep`. Returns the final reply and the token
+    /// usage, and stores the session id for the next turn. `onStep` is called off
+    /// the main thread — hop before touching UI.
     func stream(
         _ instruction: String, in project: Project, onStep: @escaping (String) -> Void
-    ) async -> String? {
-        guard let path = executablePath ?? locate() else { return nil }
+    ) async -> (reply: String?, usage: AgentUsage?) {
+        guard let path = executablePath ?? locate() else { return (nil, nil) }
         let args = arguments(for: instruction, in: project)
 
         return await withCheckedContinuation { continuation in
             Task.detached {
                 var result: String?
+                var usage: AgentUsage?
                 Shell.stream(path, args, cwd: project.root) { line in
-                    self.handle(line, project: project, onStep: onStep) { result = $0 }
+                    self.handle(
+                        line, project: project, onStep: onStep,
+                        setResult: { result = $0 }, setUsage: { usage = $0 })
                 }
-                continuation.resume(returning: result)
+                continuation.resume(returning: (result, usage))
             }
         }
     }
@@ -99,10 +111,10 @@ final class ClaudeService {
     // MARK: - Parsing the stream
 
     /// Parse one stream-json line: capture the session id, turn tool uses into
-    /// human-readable steps, and pick up the final `result`.
+    /// human-readable steps, and pick up the final `result` and its token usage.
     private func handle(
         _ line: String, project: Project,
-        onStep: (String) -> Void, setResult: (String) -> Void
+        onStep: (String) -> Void, setResult: (String) -> Void, setUsage: (AgentUsage) -> Void
     ) {
         guard let data = line.data(using: .utf8),
             let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -124,9 +136,21 @@ final class ClaudeService {
             {
                 setResult(result)
             }
+            if let usage = obj["usage"] as? [String: Any] {
+                setUsage(Self.usage(from: usage))
+            }
         default:
             break
         }
+    }
+
+    /// Token usage from a result `usage` object. Uses the new (uncached) input —
+    /// not the cached system prompt + tools + prior turns — so the shown "in"
+    /// reflects the turn's real input, not the fixed ~25k CLI overhead.
+    private static func usage(from dict: [String: Any]) -> AgentUsage {
+        func count(_ key: String) -> Int { (dict[key] as? NSNumber)?.intValue ?? 0 }
+        return AgentUsage(
+            inputTokens: count("input_tokens"), outputTokens: count("output_tokens"))
     }
 
     /// A short "what it's doing now" line from a tool_use block.

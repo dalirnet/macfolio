@@ -12,32 +12,41 @@ final class ChatStore: ObservableObject {
 
     /// The agent's final reply for the current turn (nil while empty or working).
     @Published private(set) var reply: String?
+    /// The token usage of the current reply's turn (nil until it completes).
+    @Published private(set) var usage: AgentUsage?
     @Published private(set) var working = false
     /// Live per-step progress for the in-flight turn (reading/writing files).
     @Published private(set) var activity: [String] = []
 
-    /// Each project's most recent reply, so switching projects restores its slot.
-    private var replyByProject: [String: String] = [:]
+    /// Each project's most recent reply + usage, so switching projects restores it.
+    private struct Turn {
+        var reply: String?
+        var usage: AgentUsage?
+    }
+    private var byProject: [String: Turn] = [:]
     private var activeProject: String?
 
     private init() {}
 
     /// Swap the visible slot when the open project changes.
     func activate(_ project: Project?) {
-        if let activeProject { replyByProject[activeProject] = reply }
+        if let activeProject { byProject[activeProject] = Turn(reply: reply, usage: usage) }
         activeProject = project?.id
-        reply = project.flatMap { replyByProject[$0.id] }
+        let turn = project.flatMap { byProject[$0.id] }
+        reply = turn?.reply
+        usage = turn?.usage
     }
 
     /// Send one instruction: stream progress into `activity`, then surface the
-    /// agent's final reply in the same slot. `focus` is the file the user currently
-    /// has open, and `selection` is the caret's selection/line, both passed to the
-    /// agent as the request's context.
+    /// agent's final reply (and its token usage) in the same slot. `focus` is the
+    /// file the user currently has open, and `selection` is the caret's
+    /// selection/line, both passed to the agent as the request's context.
     func send(
         _ instruction: String, in project: Project, focus file: ProjectFile?,
         selection: EditorSelectionContext
     ) async {
         reply = nil
+        usage = nil
         working = true
         activity = []
 
@@ -48,7 +57,8 @@ final class ChatStore: ObservableObject {
 
         working = false
         activity = []
-        reply = result ?? "The agent returned nothing."
+        reply = result.reply ?? "The agent returned nothing."
+        usage = result.usage
     }
 
     /// Frame the instruction as a task over the project's Markdown files. Language
