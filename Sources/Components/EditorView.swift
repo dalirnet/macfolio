@@ -14,6 +14,9 @@ struct EditorView: NSViewRepresentable {
     let editable: Bool
     let fileURL: URL?
     let projectRoot: URL?
+    /// Extra scroll space at the bottom of the content so the last lines clear the
+    /// floating AI bar overlaid on top of the editor.
+    let bottomInset: CGFloat
     let onSave: (String) -> Void
 
     private static let bundleURL: URL? = {
@@ -68,6 +71,10 @@ struct EditorView: NSViewRepresentable {
             coordinator.editable = editable
             coordinator.evaluate("window.macfolioSetEditable(\(editable));")
         }
+        if coordinator.bottomInset != bottomInset {
+            coordinator.bottomInset = bottomInset
+            coordinator.applyBottomInset()
+        }
     }
 
     final class Coordinator: NSObject, WKScriptMessageHandler, WKURLSchemeHandler {
@@ -79,6 +86,7 @@ struct EditorView: NSViewRepresentable {
         var pending: String?
         var fileURL: URL?
         var projectRoot: URL?
+        var bottomInset: CGFloat = 0
 
         init(onSave: @escaping (String) -> Void) { self.onSave = onSave }
 
@@ -91,6 +99,7 @@ struct EditorView: NSViewRepresentable {
             case "ready":
                 ready = true
                 pushDocIfReady()
+                applyBottomInset()
             case "save":
                 if let markdown = message.body as? String { onSave(markdown) }
             case "log":
@@ -120,6 +129,17 @@ struct EditorView: NSViewRepresentable {
             guard ready, let doc = pending else { return }
             pending = nil
             evaluate("window.macfolioLoad(\(jsEncoded(doc)));")
+        }
+
+        // Pad the scroll container (#editor-shell keeps its 15px base) so content
+        // can scroll above the floating AI bar. Injected rather than baked into
+        // the editor CSS so it tracks the bar's live height.
+        func applyBottomInset() {
+            guard ready else { return }
+            let px = max(0, Int(bottomInset.rounded()))
+            evaluate(
+                "(function(){var s=document.getElementById('editor-shell');"
+                    + "if(s){s.style.paddingBottom=(15+\(px))+'px';}})();")
         }
 
         func evaluate(_ script: String) {

@@ -8,8 +8,9 @@ struct MainView: View {
     @ObservedObject private var projects = ProjectStore.shared
     @ObservedObject private var chat = ChatStore.shared
 
-    @State private var draft = ""
-    @State private var chatOpen = true
+    @State private var promptOpen = true
+    /// Live height of the floating AI bar, used to inset the editor's bottom.
+    @State private var promptBarHeight: CGFloat = 0
     /// Bumped after the agent edits files, to reload the editor from disk.
     @State private var editorReload = 0
     /// Projects whose file list is expanded in the sidebar (seeded with the
@@ -39,12 +40,9 @@ struct MainView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
-                    chatOpen.toggle()
+                    promptOpen.toggle()
                 } label: {
-                    Image(
-                        systemName: chatOpen
-                            ? "bubble.left.and.bubble.right.fill"
-                            : "bubble.left.and.bubble.right")
+                    Image(systemName: promptOpen ? "sparkles" : "sparkle")
                 }
                 Button {
                     SettingsDialog.present()
@@ -244,21 +242,25 @@ struct MainView: View {
         }
     }
 
-    // MARK: - Detail (editor + chat footer)
+    // MARK: - Detail (editor + floating AI prompt)
 
     @ViewBuilder
     private var detail: some View {
         if projects.project == nil {
             EmptyState("Create or select a project to begin", icon: "folder")
-        } else if chatOpen {
-            VSplitView {
-                editorPane
-                    .frame(minHeight: 220, maxHeight: .infinity)
-                chatPanel
-                    .frame(minHeight: 150, idealHeight: 200)
-            }
         } else {
-            editorPane
+            ZStack(alignment: .bottom) {
+                // The editor fills the whole area (behind the bar); its content
+                // gets a bottom inset instead, so the bar's frosted material sits
+                // over the editor rather than the window background.
+                editorPane
+                if promptOpen {
+                    AIPromptBar(disabled: projects.selected == nil, onSubmit: send)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .onPreferenceChange(AIPromptBarHeightKey.self) { promptBarHeight = $0 }
+            .animation(.easeInOut(duration: 0.2), value: promptOpen)
         }
     }
 
@@ -271,116 +273,13 @@ struct MainView: View {
                 editable: !chat.working,
                 fileURL: file.url,
                 projectRoot: projects.project?.root,
+                bottomInset: promptOpen ? promptBarHeight : 0,
                 onSave: { text in projects.save(text, to: file) }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             EmptyState("Select or add a document", icon: "doc.text")
         }
-    }
-
-    // MARK: - Chat footer
-
-    private var chatPanel: some View {
-        VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10) {
-                        ForEach(chat.messages) { message in
-                            messageRow(message).id(message.id)
-                        }
-                        if chat.working {
-                            activityLog.id("activity")
-                        }
-                    }
-                    .padding(12)
-                }
-                .onChange(of: chat.messages.count) { _ in
-                    if let last = chat.messages.last {
-                        withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
-                    }
-                }
-                .onChange(of: chat.activity.count) { _ in
-                    withAnimation { proxy.scrollTo("activity", anchor: .bottom) }
-                }
-            }
-            Divider()
-            inputBar
-        }
-        .background(.background)
-    }
-
-    /// A chat bubble: user on the right, agent on the left; text direction auto.
-    private func messageRow(_ message: ChatMessage) -> some View {
-        let rtl = Bidi.isRTL(message.text)
-        let isUser = message.role == .user
-        return HStack {
-            if isUser { Spacer(minLength: 36) }
-            Text(message.text)
-                .font(Theme.ui(12))
-                .textSelection(.enabled)
-                .multilineTextAlignment(rtl ? .trailing : .leading)
-                .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(
-                    isUser
-                        ? AnyShapeStyle(Theme.primary.opacity(0.15))
-                        : AnyShapeStyle(.quaternary),
-                    in: RoundedRectangle(cornerRadius: 12)
-                )
-            if !isUser { Spacer(minLength: 36) }
-        }
-    }
-
-    /// Live "what the agent is doing" log during a streaming turn.
-    private var activityLog: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if chat.activity.isEmpty {
-                HStack(spacing: 6) {
-                    ProgressView().controlSize(.mini)
-                    Text("thinking…").font(.system(size: 11)).foregroundStyle(.secondary)
-                }
-            } else {
-                ForEach(Array(chat.activity.enumerated()), id: \.offset) { index, step in
-                    HStack(spacing: 6) {
-                        if index == chat.activity.count - 1 {
-                            ProgressView().controlSize(.mini)
-                        } else {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.tertiary)
-                                .frame(width: 12)
-                        }
-                        Text(step)
-                            .font(Theme.mono(10.5))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var inputBar: some View {
-        HStack(spacing: 8) {
-            TextField("ask claude…", text: $draft, axis: .vertical)
-                .textFieldStyle(.plain)
-                .lineLimit(1...4)
-                .disabled(chat.working || projects.project == nil)
-                .onSubmit(send)
-            Button(action: send) {
-                Image(systemName: "arrow.up.circle.fill").font(.system(size: 20))
-            }
-            .buttonStyle(.plain)
-            .foregroundColor(Theme.primary)
-            .disabled(
-                chat.working || projects.project == nil
-                    || draft.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
-        .padding(12)
     }
 
     // MARK: - Actions
@@ -406,15 +305,16 @@ struct MainView: View {
             set: { if !$0 { renameProjectTarget = nil } })
     }
 
-    private func send() {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func send(_ prompt: String) {
+        let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let project = projects.project, !chat.working else { return }
-        draft = ""
         // @MainActor so the post-turn refresh + editor reload run on the main
         // thread — otherwise the SwiftUI state changes don't propagate and the
         // editor keeps showing the pre-edit content until you reopen the file.
         Task { @MainActor in
-            await chat.send(text, in: project)  // editor is locked via chat.working
+            // Pass the open file so the agent focuses on what the user is viewing.
+            // The editor is locked while chat.working is true.
+            await chat.send(text, in: project, focus: projects.selected)
             projects.refresh()
             editorReload += 1  // reload the file from disk after the agent's edits
         }
