@@ -262,8 +262,13 @@ struct MainView: View {
                 // over the editor rather than the window background.
                 editorPane
                 if promptOpen {
-                    AIPromptBar(disabled: projects.selected == nil, onSubmit: send)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    AIPromptBar(
+                        disabled: projects.selected == nil,
+                        onSubmit: send,
+                        onNewSession: startNewSession,
+                        canStartNewSession: chat.canStartNewSession(in: projects.project)
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .onPreferenceChange(AIPromptBarHeightKey.self) { promptBarHeight = $0 }
@@ -311,6 +316,11 @@ struct MainView: View {
         Binding(
             get: { renameProjectTarget != nil },
             set: { if !$0 { renameProjectTarget = nil } })
+    }
+
+    private func startNewSession() {
+        guard let project = projects.project else { return }
+        chat.newSession(in: project)
     }
 
     private func send(_ prompt: String) {

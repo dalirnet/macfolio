@@ -26,6 +26,10 @@ struct AIPromptBar: View {
 
     let disabled: Bool
     let onSubmit: (String) -> Void
+    /// Start a fresh agent session (clear its memory of this project).
+    let onNewSession: () -> Void
+    /// Whether there's a conversation to reset (drives the new-session button).
+    let canStartNewSession: Bool
 
     @State private var draft = ""
     @State private var inputHeight: CGFloat = AIPromptBar.rowHeight
@@ -101,6 +105,9 @@ struct AIPromptBar: View {
                     onSubmit: submit
                 )
                 .frame(height: inputHeight)
+                if canStartNewSession {
+                    newSessionButton
+                }
             }
         }
         .frame(minHeight: AIPromptBar.rowHeight)
@@ -130,6 +137,19 @@ struct AIPromptBar: View {
             }
         }
         .frame(width: 18, height: 18)
+    }
+
+    /// Trailing button to start a fresh session — clears the agent's memory of the
+    /// project, so the next prompt has no prior context.
+    private var newSessionButton: some View {
+        Button(action: onNewSession) {
+            Image(systemName: "plus.bubble")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .help("New session — clear the agent's memory of this project")
     }
 
     private var canSubmit: Bool {

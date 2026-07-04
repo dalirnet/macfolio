@@ -37,6 +37,22 @@ final class ChatStore: ObservableObject {
         usage = turn?.usage
     }
 
+    /// Whether there's a conversation to reset (a session or a shown reply).
+    func canStartNewSession(in project: Project?) -> Bool {
+        guard let project else { return false }
+        return reply != nil || SessionStore.shared.hasSession(for: project)
+    }
+
+    /// Start a fresh conversation: forget the project's session and clear its slot
+    /// (reply + token usage), so the next prompt has no prior context.
+    func newSession(in project: Project) {
+        SessionStore.shared.clearSession(for: project)
+        byProject[project.id] = nil
+        reply = nil
+        usage = nil
+        activity = []
+    }
+
     /// Send one instruction: stream progress into `activity`, then surface the
     /// agent's final reply (and its token usage) in the same slot. `focus` is the
     /// file the user currently has open, and `selection` is the caret's

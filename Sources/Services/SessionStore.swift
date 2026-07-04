@@ -24,6 +24,19 @@ final class SessionStore {
     func setSession(_ id: String, for project: Project) {
         guard map[project.id] != id else { return }
         map[project.id] = id
+        persist()
+    }
+
+    /// Forget the project's session so the next turn starts a fresh conversation.
+    func clearSession(for project: Project) {
+        guard map[project.id] != nil else { return }
+        map[project.id] = nil
+        persist()
+    }
+
+    func hasSession(for project: Project) -> Bool { map[project.id] != nil }
+
+    private func persist() {
         if let data = try? JSONEncoder().encode(map) {
             try? data.write(to: Self.file)
         }
