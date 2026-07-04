@@ -1153,9 +1153,10 @@ const REMOVE_ICON =
     "M6.5625 18.6035C6.93359 18.6035 7.17773 18.3691 7.16797 18.0273L6.86523 7.57812C6.85547 7.23633 6.61133 7.01172 6.25977 7.01172C5.88867 7.01172 5.64453 7.24609 5.6543 7.58789L5.94727 18.0273C5.95703 18.3789 6.20117 18.6035 6.5625 18.6035ZM9.45312 18.6035C9.82422 18.6035 10.0879 18.3691 10.0879 18.0273L10.0879 7.58789C10.0879 7.24609 9.82422 7.01172 9.45312 7.01172C9.08203 7.01172 8.82812 7.24609 8.82812 7.58789L8.82812 18.0273C8.82812 18.3691 9.08203 18.6035 9.45312 18.6035ZM12.3535 18.6035C12.7051 18.6035 12.9492 18.3789 12.959 18.0273L13.252 7.58789C13.2617 7.24609 13.0176 7.01172 12.6465 7.01172C12.2949 7.01172 12.0508 7.23633 12.041 7.58789L11.748 18.0273C11.7383 18.3691 11.9824 18.6035 12.3535 18.6035ZM5.16602 4.46289L6.71875 4.46289L6.71875 2.37305C6.71875 1.81641 7.10938 1.45508 7.69531 1.45508L11.1914 1.45508C11.7773 1.45508 12.168 1.81641 12.168 2.37305L12.168 4.46289L13.7207 4.46289L13.7207 2.27539C13.7207 0.859375 12.8027 0 11.2988 0L7.58789 0C6.08398 0 5.16602 0.859375 5.16602 2.27539ZM0.732422 5.24414L18.1836 5.24414C18.584 5.24414 18.9062 4.90234 18.9062 4.50195C18.9062 4.10156 18.584 3.76953 18.1836 3.76953L0.732422 3.76953C0.341797 3.76953 0 4.10156 0 4.50195C0 4.91211 0.341797 5.24414 0.732422 5.24414ZM4.98047 21.748L13.9355 21.748C15.332 21.748 16.2695 20.8398 16.3379 19.4434L17.0215 5.05859L15.4492 5.05859L14.7949 19.2773C14.7754 19.8633 14.3555 20.2734 13.7793 20.2734L5.11719 20.2734C4.56055 20.2734 4.14062 19.8535 4.11133 19.2773L3.41797 5.05859L1.88477 5.05859L2.57812 19.4531C2.64648 20.8496 3.56445 21.748 4.98047 21.748Z" +
     '"/></g></svg>';
 
-// A "×" in the side gutter of the focused block; clicking it deletes that block.
-// Follows the caret/selection (not the mouse), so it appears for whichever block
-// is currently focused. Returns a teardown.
+// Marks the focused block: a "×" in its start-side gutter (click to delete it)
+// and a full-height accent bar in the opposite gutter (the AI's "this block").
+// Both follow the caret/selection, not the mouse. The bar persists when focus
+// leaves for the prompt field — only the delete button hides. Returns a teardown.
 function registerBlockRemove(
     editor: LexicalEditor,
     scrollEl: HTMLElement,
@@ -1175,11 +1176,27 @@ function registerBlockRemove(
     });
     document.body.appendChild(button);
 
+    // A full-height bar in the block's *end* gutter (opposite the remove button)
+    // marking the focused block — the one an AI prompt treats as "this block". It
+    // stays put when focus leaves the editor for the prompt field (only the delete
+    // button hides on blur), so you can see what the prompt will act on.
+    const bar = document.createElement("div");
+    bar.className = "mf-block-bar";
+    document.body.appendChild(bar);
+
     let target: HTMLElement | null = null;
 
+    // No focused block: hide both.
     function hide(): void {
         button.classList.remove("mf-remove-btn--visible");
+        bar.classList.remove("mf-block-bar--visible");
         target = null;
+    }
+
+    // On blur, hide only the delete button; keep the bar on the last block so it
+    // stays visible while the user types in the prompt field.
+    function hideButton(): void {
+        button.classList.remove("mf-remove-btn--visible");
     }
 
     // Sit in the block's side gutter (start side for LTR, end for RTL), vertically
@@ -1196,6 +1213,28 @@ function registerBlockRemove(
         const top = rect.top + (rect.height - size) / 2;
         button.style.top = `${Math.round(top)}px`;
         button.style.left = `${Math.round(left)}px`;
+    }
+
+    // The bar spans the block's full height in the end-side gutter — the opposite
+    // side from the remove button (right for LTR, left for RTL). Anchored to the
+    // text column's edge (from the editor root), not the block's own width, so
+    // shrink-to-fit blocks (images, tables) get the bar in the same side gutter as
+    // text instead of hugging their edge.
+    function positionBar(el: HTMLElement): void {
+        const gap = 6;
+        const width = 3;
+        const rect = el.getBoundingClientRect();
+        const column = editorEl!.getBoundingClientRect();
+        const style = window.getComputedStyle(editorEl!);
+        const padLeft = parseFloat(style.paddingLeft) || 0;
+        const padRight = parseFloat(style.paddingRight) || 0;
+        const rtl = window.getComputedStyle(el).direction === "rtl";
+        const left = rtl
+            ? column.left + padLeft - gap - width
+            : column.right - padRight + gap;
+        bar.style.top = `${Math.round(rect.top)}px`;
+        bar.style.height = `${Math.round(rect.height)}px`;
+        bar.style.left = `${Math.round(left)}px`;
     }
 
     // DOM element of the top-level block holding the current selection (works for
@@ -1233,7 +1272,9 @@ function registerBlockRemove(
         if (el) {
             target = el;
             positionFor(el);
+            positionBar(el);
             button.classList.add("mf-remove-btn--visible");
+            bar.classList.add("mf-block-bar--visible");
         } else {
             hide();
         }
@@ -1257,11 +1298,12 @@ function registerBlockRemove(
     const reposition = () => {
         if (target) {
             positionFor(target);
+            positionBar(target);
         }
     };
 
     button.addEventListener("click", onClick);
-    editorEl.addEventListener("blur", hide);
+    editorEl.addEventListener("blur", hideButton);
     editorEl.addEventListener("focus", refresh);
     scrollEl.addEventListener("scroll", reposition, true);
     const unregisterUpdate = editor.registerUpdateListener(() => {
@@ -1270,10 +1312,11 @@ function registerBlockRemove(
 
     return () => {
         unregisterUpdate();
-        editorEl.removeEventListener("blur", hide);
+        editorEl.removeEventListener("blur", hideButton);
         editorEl.removeEventListener("focus", refresh);
         scrollEl.removeEventListener("scroll", reposition, true);
         button.remove();
+        bar.remove();
     };
 }
 
@@ -1501,6 +1544,35 @@ editor.registerUpdateListener(({ dirtyElements }) => {
     editor.update(() => {
         ensureTrailingParagraph();
     });
+});
+
+// --- Selection context ---
+// Report the caret's block ("this line") and any selected text to the host, so an
+// AI prompt like "expand the selection" or "remove this line" has something
+// concrete to act on. Skip non-range selections (e.g. when focus leaves the
+// editor to the prompt field) so the last in-editor selection is preserved.
+
+let lastSelectionReport = "";
+
+function reportSelection(): void {
+    editor.getEditorState().read(() => {
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection)) {
+            return;
+        }
+        const selectedText = selection.getTextContent();
+        const block = selection.anchor.getNode().getTopLevelElement();
+        const blockText = block ? block.getTextContent() : "";
+        const payload = JSON.stringify({ selectedText, blockText });
+        if (payload !== lastSelectionReport) {
+            lastSelectionReport = payload;
+            post("selection", { selectedText, blockText });
+        }
+    });
+}
+
+editor.registerUpdateListener(() => {
+    reportSelection();
 });
 
 // --- Host bridge: inbound calls from the host ---

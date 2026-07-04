@@ -31,13 +31,17 @@ final class ChatStore: ObservableObject {
 
     /// Send one instruction: stream progress into `activity`, then surface the
     /// agent's final reply in the same slot. `focus` is the file the user currently
-    /// has open, passed to the agent as the request's context.
-    func send(_ instruction: String, in project: Project, focus file: ProjectFile?) async {
+    /// has open, and `selection` is the caret's selection/line, both passed to the
+    /// agent as the request's context.
+    func send(
+        _ instruction: String, in project: Project, focus file: ProjectFile?,
+        selection: EditorSelectionContext
+    ) async {
         reply = nil
         working = true
         activity = []
 
-        let framed = framed(instruction, focus: file, in: project)
+        let framed = framed(instruction, focus: file, selection: selection, in: project)
         let result = await ClaudeService.shared.stream(framed, in: project) { step in
             Task { @MainActor in self.activity.append(step) }
         }
@@ -49,9 +53,10 @@ final class ChatStore: ObservableObject {
 
     /// Frame the instruction as a task over the project's Markdown files. Language
     /// is intentionally unspecified — the agent matches the user's and the files'.
-    private func framed(_ instruction: String, focus file: ProjectFile?, in project: Project)
-        -> String
-    {
+    private func framed(
+        _ instruction: String, focus file: ProjectFile?, selection: EditorSelectionContext,
+        in project: Project
+    ) -> String {
         var context = ""
         if let file {
             let path = relativePath(of: file.url, in: project)
@@ -59,6 +64,26 @@ final class ChatStore: ObservableObject {
                 The user currently has this file open in the editor: `\(path)`. Treat it as
                 the focus of the request unless they clearly mean another file, and read it
                 for context before making changes.
+
+
+                """
+        }
+        // The caret's context, so "expand the selection" / "remove this line" resolve.
+        if !selection.selectedText.isEmpty {
+            context += """
+                The user has selected this text in the editor; apply the request to it:
+                \"\"\"
+                \(selection.selectedText)
+                \"\"\"
+
+
+                """
+        } else if !selection.blockText.isEmpty {
+            context += """
+                The user's cursor is on this line/paragraph:
+                \"\"\"
+                \(selection.blockText)
+                \"\"\"
 
 
                 """

@@ -3,6 +3,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
 
+/// The caret's context in the editor, forwarded so an AI prompt can act on "the
+/// selection" or "this line". `blockText` is the paragraph/line the caret sits in.
+struct EditorSelectionContext: Equatable {
+    var selectedText = ""
+    var blockText = ""
+}
+
 /// The editor surface: Lexical (vanilla) WYSIWYG in a WebView. Loads the file's
 /// Markdown and posts edits back so we autosave. `docID` identifies the loaded
 /// file; `editable` is dropped to false while the agent writes. `fileURL` /
@@ -17,6 +24,8 @@ struct EditorView: NSViewRepresentable {
     /// Extra scroll space at the bottom of the content so the last lines clear the
     /// floating AI bar overlaid on top of the editor.
     let bottomInset: CGFloat
+    /// The caret's selection/line, reported as it changes (for AI prompt context).
+    let onSelection: (EditorSelectionContext) -> Void
     let onSave: (String) -> Void
 
     private static let bundleURL: URL? = {
@@ -37,6 +46,7 @@ struct EditorView: NSViewRepresentable {
         config.userContentController.add(coordinator, name: "link")
         config.userContentController.add(coordinator, name: "code")
         config.userContentController.add(coordinator, name: "image")
+        config.userContentController.add(coordinator, name: "selection")
         // Serves project images to the editor's <img> tags (see mediaUrl in JS).
         config.setURLSchemeHandler(coordinator, forURLScheme: "mfmedia")
 
@@ -59,6 +69,7 @@ struct EditorView: NSViewRepresentable {
     func updateNSView(_ webView: WKWebView, context: Context) {
         let coordinator = context.coordinator
         coordinator.onSave = onSave
+        coordinator.onSelection = onSelection
         coordinator.fileURL = fileURL
         coordinator.projectRoot = projectRoot
 
@@ -80,6 +91,7 @@ struct EditorView: NSViewRepresentable {
     final class Coordinator: NSObject, WKScriptMessageHandler, WKURLSchemeHandler {
         weak var webView: WKWebView?
         var onSave: (String) -> Void
+        var onSelection: (EditorSelectionContext) -> Void = { _ in }
         var ready = false
         var editable = true
         var loadedDoc = ""
@@ -120,6 +132,12 @@ struct EditorView: NSViewRepresentable {
                 presentImageDialog(
                     currentSrc: data?["src"] as? String ?? "",
                     currentAlt: data?["alt"] as? String ?? "")
+            case "selection":
+                let data = message.body as? [String: Any]
+                onSelection(
+                    EditorSelectionContext(
+                        selectedText: data?["selectedText"] as? String ?? "",
+                        blockText: data?["blockText"] as? String ?? ""))
             default:
                 break
             }

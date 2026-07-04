@@ -13,6 +13,8 @@ struct MainView: View {
     @State private var promptBarHeight: CGFloat = 0
     /// Bumped after the agent edits files, to reload the editor from disk.
     @State private var editorReload = 0
+    /// The editor's current caret selection/line, passed to the agent as context.
+    @State private var selection = EditorSelectionContext()
     /// Projects whose file list is expanded in the sidebar (seeded with the
     /// restored open project so its file is visible on launch).
     @State private var expandedProjects: Set<String> =
@@ -63,6 +65,10 @@ struct MainView: View {
         .onChange(of: projects.project) { project in
             chat.activate(project)
             expandOpenProject()
+        }
+        .onChange(of: projects.selected) { _ in
+            // Drop the previous file's selection; the editor re-reports on load.
+            selection = EditorSelectionContext()
         }
         .onReceive(NotificationCenter.default.publisher(for: .newProject)) { _ in
             startNewProject()
@@ -275,6 +281,7 @@ struct MainView: View {
                 fileURL: file.url,
                 projectRoot: projects.project?.root,
                 bottomInset: promptOpen ? promptBarHeight : 0,
+                onSelection: { selection = $0 },
                 onSave: { text in projects.save(text, to: file) }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -313,9 +320,9 @@ struct MainView: View {
         // thread — otherwise the SwiftUI state changes don't propagate and the
         // editor keeps showing the pre-edit content until you reopen the file.
         Task { @MainActor in
-            // Pass the open file so the agent focuses on what the user is viewing.
-            // The editor is locked while chat.working is true.
-            await chat.send(text, in: project, focus: projects.selected)
+            // Pass the open file + caret context so the agent can act on "the
+            // selection" or "this line". The editor is locked while chat.working.
+            await chat.send(text, in: project, focus: projects.selected, selection: selection)
             projects.refresh()
             editorReload += 1  // reload the file from disk after the agent's edits
         }

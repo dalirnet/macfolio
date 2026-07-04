@@ -290,6 +290,23 @@ body {
     height: 12px;
 }
 
+/* Active-block bar — a full-height accent line in the gutter opposite the remove
+   button, marking the focused block (the AI's "this block"). Positioned by JS;
+   persists when focus moves to the prompt field. */
+.mf-block-bar {
+    position: fixed;
+    z-index: 55;
+    display: none;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--mf-accent);
+    pointer-events: none;
+}
+
+.mf-block-bar--visible {
+    display: block;
+}
+
 /* Table — GFM. Column order follows the table's dir="auto"; each cell's text
    bidi-auto via unicode-bidi:plaintext, so Persian cells right-align on their own. */
 .mf-table {
