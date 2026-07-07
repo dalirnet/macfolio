@@ -1,0 +1,456 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+		AF0000000000000000000001 /* MacfolioApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MacfolioApp.swift; path = Sources/MacfolioApp.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000002 /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Project.swift; path = Sources/Models/Project.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000003 /* SidebarNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SidebarNode.swift; path = Sources/Models/SidebarNode.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000004 /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProjectStore.swift; path = Sources/Services/ProjectStore.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000005 /* EmptyState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EmptyState.swift; path = Sources/Components/EmptyState.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000006 /* Bidi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Bidi.swift; path = Sources/Utils/Bidi.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000007 /* Paths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Paths.swift; path = Sources/Utils/Paths.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000008 /* ChatStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ChatStore.swift; path = Sources/Services/ChatStore.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000009 /* ClaudeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ClaudeService.swift; path = Sources/Services/ClaudeService.swift; sourceTree = SOURCE_ROOT; };
+		AF000000000000000000000A /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SessionStore.swift; path = Sources/Services/SessionStore.swift; sourceTree = SOURCE_ROOT; };
+		AF000000000000000000000B /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SettingsStore.swift; path = Sources/Services/SettingsStore.swift; sourceTree = SOURCE_ROOT; };
+		AF000000000000000000000C /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EditorView.swift; path = Sources/Components/EditorView.swift; sourceTree = SOURCE_ROOT; };
+		AF000000000000000000000D /* MarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MarkdownView.swift; path = Sources/Components/MarkdownView.swift; sourceTree = SOURCE_ROOT; };
+		AF000000000000000000000E /* PromptTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PromptTextField.swift; path = Sources/Components/PromptTextField.swift; sourceTree = SOURCE_ROOT; };
+		AF000000000000000000000F /* Shell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Shell.swift; path = Sources/Utils/Shell.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000010 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Theme.swift; path = Sources/Utils/Theme.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000011 /* AIPromptBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AIPromptBar.swift; path = Sources/Views/AIPromptBar.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000012 /* AccessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AccessView.swift; path = Sources/Views/AccessView.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000013 /* DialogField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DialogField.swift; path = Sources/Views/DialogField.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000014 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MainView.swift; path = Sources/Views/MainView.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000015 /* SettingsDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SettingsDialog.swift; path = Sources/Views/SettingsDialog.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000016 /* TouchMainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TouchMainView.swift; path = Sources/Touch/TouchMainView.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000017 /* TouchEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TouchEditorView.swift; path = Sources/Touch/TouchEditorView.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000018 /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fonts; path = Resources/Fonts; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000019 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; name = AppIcon.icns; path = Resources/AppIcon.icns; sourceTree = SOURCE_ROOT; };
+		AF000000000000000000001A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = Resources/Info.plist; sourceTree = SOURCE_ROOT; };
+		AF000000000000000000001B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		AF000000000000000000001C /* Macfolio.app (macOS) */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Macfolio.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AF000000000000000000001D /* Macfolio.app (iOS) */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Macfolio.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AF000000000000000000001E /* MacfolioApp.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000001 /* MacfolioApp.swift */; };
+		AF000000000000000000001F /* MacfolioApp.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000001 /* MacfolioApp.swift */; };
+		AF0000000000000000000020 /* Project.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000002 /* Project.swift */; };
+		AF0000000000000000000021 /* Project.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000002 /* Project.swift */; };
+		AF0000000000000000000022 /* SidebarNode.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000003 /* SidebarNode.swift */; };
+		AF0000000000000000000023 /* SidebarNode.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000003 /* SidebarNode.swift */; };
+		AF0000000000000000000024 /* ProjectStore.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000004 /* ProjectStore.swift */; };
+		AF0000000000000000000025 /* ProjectStore.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000004 /* ProjectStore.swift */; };
+		AF0000000000000000000026 /* EmptyState.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000005 /* EmptyState.swift */; };
+		AF0000000000000000000027 /* EmptyState.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000005 /* EmptyState.swift */; };
+		AF0000000000000000000028 /* Bidi.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000006 /* Bidi.swift */; };
+		AF0000000000000000000029 /* Bidi.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000006 /* Bidi.swift */; };
+		AF000000000000000000002A /* Paths.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000007 /* Paths.swift */; };
+		AF000000000000000000002B /* Paths.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000007 /* Paths.swift */; };
+		AF000000000000000000002C /* ChatStore.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000008 /* ChatStore.swift */; };
+		AF000000000000000000002D /* ClaudeService.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000009 /* ClaudeService.swift */; };
+		AF000000000000000000002E /* SessionStore.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF000000000000000000000A /* SessionStore.swift */; };
+		AF000000000000000000002F /* SettingsStore.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF000000000000000000000B /* SettingsStore.swift */; };
+		AF0000000000000000000030 /* EditorView.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF000000000000000000000C /* EditorView.swift */; };
+		AF0000000000000000000031 /* MarkdownView.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF000000000000000000000D /* MarkdownView.swift */; };
+		AF0000000000000000000032 /* PromptTextField.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF000000000000000000000E /* PromptTextField.swift */; };
+		AF0000000000000000000033 /* Shell.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF000000000000000000000F /* Shell.swift */; };
+		AF0000000000000000000034 /* Theme.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000010 /* Theme.swift */; };
+		AF0000000000000000000035 /* AIPromptBar.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000011 /* AIPromptBar.swift */; };
+		AF0000000000000000000036 /* AccessView.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000012 /* AccessView.swift */; };
+		AF0000000000000000000037 /* DialogField.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000013 /* DialogField.swift */; };
+		AF0000000000000000000038 /* MainView.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000014 /* MainView.swift */; };
+		AF0000000000000000000039 /* SettingsDialog.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000015 /* SettingsDialog.swift */; };
+		AF000000000000000000003A /* TouchMainView.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000016 /* TouchMainView.swift */; };
+		AF000000000000000000003B /* TouchEditorView.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000017 /* TouchEditorView.swift */; };
+		AF000000000000000000003C /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000018 /* Fonts */; };
+		AF000000000000000000003D /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000019 /* AppIcon.icns */; };
+		AF000000000000000000003E /* Fonts in Resources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000018 /* Fonts */; };
+		AF000000000000000000003F /* Assets.xcassets in Resources (ios) */ = {isa = PBXBuildFile; fileRef = AF000000000000000000001B /* Assets.xcassets */; };
+		AF0000000000000000000040 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				AF0000000000000000000001 /* MacfolioApp.swift */,
+				AF0000000000000000000002 /* Project.swift */,
+				AF0000000000000000000003 /* SidebarNode.swift */,
+				AF0000000000000000000004 /* ProjectStore.swift */,
+				AF0000000000000000000005 /* EmptyState.swift */,
+				AF0000000000000000000006 /* Bidi.swift */,
+				AF0000000000000000000007 /* Paths.swift */,
+				AF0000000000000000000008 /* ChatStore.swift */,
+				AF0000000000000000000009 /* ClaudeService.swift */,
+				AF000000000000000000000A /* SessionStore.swift */,
+				AF000000000000000000000B /* SettingsStore.swift */,
+				AF000000000000000000000C /* EditorView.swift */,
+				AF000000000000000000000D /* MarkdownView.swift */,
+				AF000000000000000000000E /* PromptTextField.swift */,
+				AF000000000000000000000F /* Shell.swift */,
+				AF0000000000000000000010 /* Theme.swift */,
+				AF0000000000000000000011 /* AIPromptBar.swift */,
+				AF0000000000000000000012 /* AccessView.swift */,
+				AF0000000000000000000013 /* DialogField.swift */,
+				AF0000000000000000000014 /* MainView.swift */,
+				AF0000000000000000000015 /* SettingsDialog.swift */,
+				AF0000000000000000000016 /* TouchMainView.swift */,
+				AF0000000000000000000017 /* TouchEditorView.swift */,
+			);
+			name = Sources;
+			sourceTree = "<group>";
+		};
+		AF0000000000000000000041 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				AF000000000000000000001A /* Info.plist */,
+				AF000000000000000000001B /* Assets.xcassets */,
+				AF0000000000000000000018 /* Fonts */,
+				AF0000000000000000000019 /* AppIcon.icns */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		AF0000000000000000000042 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AF000000000000000000001C /* Macfolio.app */,
+				AF000000000000000000001D /* Macfolio.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AF0000000000000000000043 = {
+			isa = PBXGroup;
+			children = (
+				AF0000000000000000000040 /* Sources */,
+				AF0000000000000000000041 /* Resources */,
+				AF0000000000000000000042 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AF0000000000000000000044 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AF000000000000000000001E,
+				AF0000000000000000000020,
+				AF0000000000000000000022,
+				AF0000000000000000000024,
+				AF0000000000000000000026,
+				AF0000000000000000000028,
+				AF000000000000000000002A,
+				AF000000000000000000002C,
+				AF000000000000000000002D,
+				AF000000000000000000002E,
+				AF000000000000000000002F,
+				AF0000000000000000000030,
+				AF0000000000000000000031,
+				AF0000000000000000000032,
+				AF0000000000000000000033,
+				AF0000000000000000000034,
+				AF0000000000000000000035,
+				AF0000000000000000000036,
+				AF0000000000000000000037,
+				AF0000000000000000000038,
+				AF0000000000000000000039,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AF0000000000000000000045 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AF0000000000000000000046 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AF000000000000000000003C,
+				AF000000000000000000003D,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AF0000000000000000000047 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AF000000000000000000001F,
+				AF0000000000000000000021,
+				AF0000000000000000000023,
+				AF0000000000000000000025,
+				AF0000000000000000000027,
+				AF0000000000000000000029,
+				AF000000000000000000002B,
+				AF000000000000000000003A,
+				AF000000000000000000003B,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AF0000000000000000000048 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AF0000000000000000000049 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AF000000000000000000003E,
+				AF000000000000000000003F,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AF000000000000000000004A = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Embed editor bundle";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "DEST=\"$CODESIGNING_FOLDER_PATH/Contents/Resources/editor\"\n# Build the bundle only if it is missing AND npm is reachable (Xcode build\n# phases have a minimal PATH, so npm often is not); otherwise reuse the\n# bundle produced by 'make'.\nif [ ! -d \"$SRCROOT/build/editor\" ] && [ -f \"$SRCROOT/Resources/Editor/package.json\" ] && command -v npm >/dev/null 2>&1; then\n  ( cd \"$SRCROOT/Resources/Editor\" && { [ -d node_modules ] || npm install; } && ./node_modules/.bin/vite build )\nfi\nif [ -d \"$SRCROOT/build/editor\" ]; then\n  rm -rf \"$DEST\"; mkdir -p \"$DEST\"\n  cp -R \"$SRCROOT/build/editor/.\" \"$DEST/\"\nelse\n  echo \"warning: build/editor missing — run make once to build the editor bundle\"\nfi\n";
+		};
+		AF000000000000000000004B = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Embed editor bundle";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "DEST=\"$CODESIGNING_FOLDER_PATH/editor\"\n# Build the bundle only if it is missing AND npm is reachable (Xcode build\n# phases have a minimal PATH, so npm often is not); otherwise reuse the\n# bundle produced by 'make'.\nif [ ! -d \"$SRCROOT/build/editor\" ] && [ -f \"$SRCROOT/Resources/Editor/package.json\" ] && command -v npm >/dev/null 2>&1; then\n  ( cd \"$SRCROOT/Resources/Editor\" && { [ -d node_modules ] || npm install; } && ./node_modules/.bin/vite build )\nfi\nif [ -d \"$SRCROOT/build/editor\" ]; then\n  rm -rf \"$DEST\"; mkdir -p \"$DEST\"\n  cp -R \"$SRCROOT/build/editor/.\" \"$DEST/\"\nelse\n  echo \"warning: build/editor missing — run make once to build the editor bundle\"\nfi\n";
+		};
+		AF000000000000000000004C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				SWIFT_VERSION = 5.0;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AF000000000000000000004D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				SWIFT_VERSION = 5.0;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		AF000000000000000000004E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 227UTY6845;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks");
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dalirnet.macfolio;
+				PRODUCT_NAME = Macfolio;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		AF000000000000000000004F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 227UTY6845;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks");
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dalirnet.macfolio;
+				PRODUCT_NAME = Macfolio;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		AF0000000000000000000050 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 227UTY6845;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dalirnet.macfolio;
+				PRODUCT_NAME = Macfolio;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AF0000000000000000000051 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 227UTY6845;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIFileSharingEnabled = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dalirnet.macfolio;
+				PRODUCT_NAME = Macfolio;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		AF0000000000000000000052 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF000000000000000000004C /* Debug */,
+				AF000000000000000000004D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AF0000000000000000000053 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF000000000000000000004E /* Debug */,
+				AF000000000000000000004F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AF0000000000000000000054 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF0000000000000000000050 /* Debug */,
+				AF0000000000000000000051 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AF0000000000000000000055 /* Macfolio (macOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AF0000000000000000000053;
+			buildPhases = (
+				AF0000000000000000000044,
+				AF0000000000000000000045,
+				AF0000000000000000000046,
+				AF000000000000000000004A,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Macfolio (macOS)";
+			productName = Macfolio;
+			productReference = AF000000000000000000001C /* Macfolio.app */;
+			productType = "com.apple.product-type.application";
+		};
+		AF0000000000000000000056 /* Macfolio (iOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AF0000000000000000000054;
+			buildPhases = (
+				AF0000000000000000000047,
+				AF0000000000000000000048,
+				AF0000000000000000000049,
+				AF000000000000000000004B,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Macfolio (iOS)";
+			productName = Macfolio;
+			productReference = AF000000000000000000001D /* Macfolio.app */;
+			productType = "com.apple.product-type.application";
+		};
+		AF0000000000000000000057 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1520;
+				LastUpgradeCheck = 1520;
+				TargetAttributes = {
+					AF0000000000000000000055 = {CreatedOnToolsVersion = 15.2;};
+					AF0000000000000000000056 = {CreatedOnToolsVersion = 15.2;};
+				};
+			};
+			buildConfigurationList = AF0000000000000000000052;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AF0000000000000000000043;
+			productRefGroup = AF0000000000000000000042 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AF0000000000000000000055 /* Macfolio (macOS) */,
+				AF0000000000000000000056 /* Macfolio (iOS) */,
+			);
+		};
+
+	};
+	rootObject = AF0000000000000000000057;
+}
