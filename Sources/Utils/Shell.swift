@@ -39,8 +39,14 @@ enum Shell {
     /// Run a process and deliver stdout **line by line** as it arrives (for
     /// `--output-format stream-json`). Blocks until the process exits, so call
     /// it off the main thread. `onLine` is invoked on this calling thread.
+    ///
+    /// `onStart` receives the running `Process` so the caller can `terminate()`
+    /// it (e.g. to cancel). If `timeout` elapses before the process exits, it is
+    /// terminated — a hung turn can't block the reader forever.
     static func stream(
         _ executable: String, _ args: [String], cwd: URL? = nil,
+        timeout: TimeInterval? = nil,
+        onStart: ((Process) -> Void)? = nil,
         onLine: (String) -> Void
     ) {
         let process = Process()
@@ -56,6 +62,16 @@ enum Shell {
         } catch {
             return
         }
+        onStart?(process)
+
+        // Watchdog: terminate the process if it outlives `timeout`. Terminating
+        // closes the pipe, so the read loop below drains and exits.
+        var watchdog: DispatchWorkItem?
+        if let timeout {
+            let item = DispatchWorkItem { process.terminate() }
+            watchdog = item
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: item)
+        }
 
         var buffer = Data()
         while case let chunk = handle.availableData, !chunk.isEmpty {
@@ -66,6 +82,7 @@ enum Shell {
                 if let line = String(data: lineData, encoding: .utf8) { onLine(line) }
             }
         }
+        watchdog?.cancel()
         process.waitUntilExit()
         if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) { onLine(line) }
     }

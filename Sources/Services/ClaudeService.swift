@@ -9,6 +9,39 @@ struct AgentUsage: Equatable {
     var outputTokens: Int
 }
 
+/// One update from a running turn, delivered in order over an `AsyncStream`.
+enum TurnEvent {
+    /// A short "what it's doing now" line (reading/writing a file, searching).
+    case step(String)
+    /// A new reply text block began — clear any previously streamed live text.
+    case replyReset
+    /// A chunk of the assistant's reply text, as it's generated.
+    case replyDelta(String)
+    /// The turn finished: the authoritative final reply and its token usage.
+    case finished(reply: String?, usage: AgentUsage?)
+}
+
+/// Holds the running `Process` so a cancelled turn can terminate it, coping with
+/// the race where cancellation arrives before the process has started.
+private final class ProcessBox {
+    private let lock = NSLock()
+    private var process: Process?
+    private var cancelled = false
+
+    func set(_ process: Process) {
+        lock.lock()
+        defer { lock.unlock() }
+        if cancelled { process.terminate() } else { self.process = process }
+    }
+
+    func terminate() {
+        lock.lock()
+        defer { lock.unlock() }
+        cancelled = true
+        process?.terminate()
+    }
+}
+
 /// Macfolio's single dependency: the Claude Code CLI.
 ///
 /// Macfolio *drives* Claude Code to write: it runs with tools enabled inside the
@@ -67,26 +100,59 @@ final class ClaudeService {
 
     // MARK: - Running a turn
 
-    /// Run one agent turn inside the project folder, streaming per-step progress
-    /// (reading/writing files) via `onStep`. Returns the final reply and the token
-    /// usage, and stores the session id for the next turn. `onStep` is called off
-    /// the main thread — hop before touching UI.
-    func stream(
-        _ instruction: String, in project: Project, onStep: @escaping (String) -> Void
-    ) async -> (reply: String?, usage: AgentUsage?) {
-        guard let path = executablePath ?? locate() else { return (nil, nil) }
-        let args = arguments(for: instruction, in: project)
+    /// Hard ceiling on a single turn. Agentic edits can take a while, but a hung
+    /// process must eventually release the UI rather than block forever.
+    private static let turnTimeout: TimeInterval = 300
 
-        return await withCheckedContinuation { continuation in
-            Task.detached {
+    /// Run one agent turn inside the project folder, emitting ordered `TurnEvent`s:
+    /// per-step progress (reading/writing files), the reply text as it streams, and
+    /// a final `.finished` with the authoritative reply + token usage. The session
+    /// id for the next turn is stored as it arrives.
+    ///
+    /// Consume with `for await`. Cancelling the consuming task (or letting the turn
+    /// exceed `turnTimeout`) terminates the underlying CLI process.
+    func run(_ instruction: String, in project: Project) -> AsyncStream<TurnEvent> {
+        AsyncStream { continuation in
+            guard let path = executablePath ?? locate() else {
+                continuation.yield(.finished(reply: nil, usage: nil))
+                continuation.finish()
+                return
+            }
+            let args = arguments(for: instruction, in: project)
+            let box = ProcessBox()
+
+            let worker = Task.detached {
                 var result: String?
                 var usage: AgentUsage?
-                Shell.stream(path, args, cwd: project.root) { line in
+                // Accumulates the last streamed text block, used as the reply when
+                // the process is cut short (timeout/cancel) before a `result`.
+                var streamed = ""
+                Shell.stream(
+                    path, args, cwd: project.root, timeout: Self.turnTimeout,
+                    onStart: { box.set($0) }
+                ) { line in
                     self.handle(
-                        line, project: project, onStep: onStep,
+                        line, project: project,
+                        emit: { event in
+                            switch event {
+                            case .replyReset: streamed = ""
+                            case .replyDelta(let text): streamed += text
+                            default: break
+                            }
+                            continuation.yield(event)
+                        },
                         setResult: { result = $0 }, setUsage: { usage = $0 })
                 }
-                continuation.resume(returning: (result, usage))
+                let reply = result ?? (streamed.isEmpty ? nil : streamed)
+                continuation.yield(.finished(reply: reply, usage: usage))
+                continuation.finish()
+            }
+
+            continuation.onTermination = { _ in
+                // Fires on normal finish and on cancellation; terminate the process
+                // in both cases (a no-op once it has already exited).
+                box.terminate()
+                worker.cancel()
             }
         }
     }
@@ -100,6 +166,9 @@ final class ClaudeService {
             "--permission-mode", SettingsStore.shared.permissionMode.rawValue,
             "--output-format", "stream-json",
             "--verbose",  // required with stream-json in print mode
+            // Stream the reply token-by-token so it appears as it's written,
+            // instead of only after the whole turn finishes.
+            "--include-partial-messages",
             "--model", SettingsStore.shared.model.rawValue,
         ]
         if let sessionID = SessionStore.shared.session(for: project) {
@@ -110,11 +179,12 @@ final class ClaudeService {
 
     // MARK: - Parsing the stream
 
-    /// Parse one stream-json line: capture the session id, turn tool uses into
-    /// human-readable steps, and pick up the final `result` and its token usage.
+    /// Parse one stream-json line: capture the session id, stream the reply text
+    /// as it arrives, turn tool uses into human-readable steps, and pick up the
+    /// final `result` and its token usage.
     private func handle(
         _ line: String, project: Project,
-        onStep: (String) -> Void, setResult: (String) -> Void, setUsage: (AgentUsage) -> Void
+        emit: (TurnEvent) -> Void, setResult: (String) -> Void, setUsage: (AgentUsage) -> Void
     ) {
         guard let data = line.data(using: .utf8),
             let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -125,10 +195,31 @@ final class ClaudeService {
         }
 
         switch obj["type"] as? String {
+        case "stream_event":
+            // Partial-message events: reply text as it's generated. Thinking
+            // (`thinking_delta`) and tool-input deltas are ignored here.
+            guard let event = obj["event"] as? [String: Any] else { break }
+            switch event["type"] as? String {
+            case "content_block_start":
+                // A fresh text block: drop any prior live text so only the last
+                // block (the final reply) shows, not intermediate commentary.
+                if (event["content_block"] as? [String: Any])?["type"] as? String == "text" {
+                    emit(.replyReset)
+                }
+            case "content_block_delta":
+                if let delta = event["delta"] as? [String: Any],
+                    delta["type"] as? String == "text_delta",
+                    let text = delta["text"] as? String
+                {
+                    emit(.replyDelta(text))
+                }
+            default:
+                break
+            }
         case "assistant":
             let content = (obj["message"] as? [String: Any])?["content"] as? [[String: Any]] ?? []
             for item in content where item["type"] as? String == "tool_use" {
-                onStep(describe(item, project: project))
+                emit(.step(describe(item, project: project)))
             }
         case "result":
             if let result = (obj["result"] as? String)?

@@ -17,6 +17,8 @@ final class ChatStore: ObservableObject {
     @Published private(set) var working = false
     /// Live per-step progress for the in-flight turn (reading/writing files).
     @Published private(set) var activity: [String] = []
+    /// The reply text streaming in for the in-flight turn (empty until it starts).
+    @Published private(set) var liveReply = ""
 
     /// Each project's most recent reply + usage, so switching projects restores it.
     private struct Turn {
@@ -51,6 +53,7 @@ final class ChatStore: ObservableObject {
         reply = nil
         usage = nil
         activity = []
+        liveReply = ""
     }
 
     /// Send one instruction: stream progress into `activity`, then surface the
@@ -65,16 +68,28 @@ final class ChatStore: ObservableObject {
         usage = nil
         working = true
         activity = []
+        liveReply = ""
 
         let framed = framed(instruction, focus: file, selection: selection, in: project)
-        let result = await ClaudeService.shared.stream(framed, in: project) { step in
-            Task { @MainActor in self.activity.append(step) }
+        // `for await` on the main actor keeps the ordered stream in order — the
+        // reply's text deltas can't scramble.
+        for await event in ClaudeService.shared.run(framed, in: project) {
+            switch event {
+            case .step(let step):
+                activity.append(step)
+            case .replyReset:
+                liveReply = ""
+            case .replyDelta(let text):
+                liveReply += text
+            case .finished(let finalReply, let finalUsage):
+                reply = finalReply ?? "The agent returned nothing."
+                usage = finalUsage
+            }
         }
 
         working = false
         activity = []
-        reply = result.reply ?? "The agent returned nothing."
-        usage = result.usage
+        liveReply = ""
     }
 
     /// Frame the instruction as a task over the project's Markdown files. Language

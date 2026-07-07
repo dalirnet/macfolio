@@ -44,10 +44,17 @@ struct AIPromptBar: View {
     /// as the row's minimum so the input and the working status are the same size.
     static let rowHeight: CGFloat = Theme.lineHeight(12.5) + 4
 
+    /// What to show in the reply area: the streaming text while a turn runs, then
+    /// the authoritative final reply. Nil when there's nothing to show yet.
+    private var displayedReply: String? {
+        if chat.working { return chat.liveReply.isEmpty ? nil : chat.liveReply }
+        return chat.reply
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            if let reply = chat.reply, !chat.working {
-                response(reply)
+            if let text = displayedReply {
+                response(text)
             }
             promptRow
         }
