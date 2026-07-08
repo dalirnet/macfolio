@@ -7,10 +7,19 @@
     /// co-author can't run on iPadOS (no `claude` subprocess).
     struct TouchMainView: View {
         @ObservedObject private var projects = ProjectStore.shared
+        @ObservedObject private var chat = ChatStore.shared
+        @ObservedObject private var settings = SettingsStore.shared
 
         /// Keep the sidebar visible alongside the editor on iPad (it otherwise starts
         /// collapsed, hiding the New Project button on a fresh launch).
         @State private var columnVisibility = NavigationSplitViewVisibility.all
+
+        /// Whether the docked AI bar is shown, and whether a backend is configured.
+        @State private var promptOpen = true
+        @State private var aiAvailable: Bool?
+        @State private var showSettings = false
+        /// Bumped after the agent edits files, to reload the editor from disk.
+        @State private var editorReload = 0
 
         /// Projects whose file list is expanded in the sidebar (seeded with the
         /// restored open project so its file is visible on launch).
@@ -32,35 +41,29 @@
             NavigationSplitView(columnVisibility: $columnVisibility) {
                 sidebar
                     .navigationTitle("Macfolio")
-                    .toolbar {
-                        ToolbarItem(placement: .primaryAction) {
-                            Button {
-                                startNewProject()
-                            } label: {
-                                Image(systemName: "folder.badge.plus")
-                            }
-                        }
-                    }
             } detail: {
                 detail
-                    .navigationTitle(projects.selected?.title ?? "Macfolio")
+                    .navigationTitle(projects.windowTitle)
                     .navigationBarTitleDisplayMode(.inline)
+                    // `.editor` role left-aligns the title as plain text (like the
+                    // Mac window title), instead of iOS's centered, tinted title.
+                    .toolbarRole(.editor)
                     .toolbar {
-                        // Always present, so the actions are reachable even before a
-                        // project or file exists (the sidebar may be collapsed).
+                        // Match the Mac toolbar: just the AI toggle and Settings.
                         ToolbarItem(placement: .primaryAction) {
                             Button {
-                                startAddFile(projects.project)
+                                promptOpen.toggle()
                             } label: {
-                                Image(systemName: "doc.badge.plus")
+                                Image(systemName: "sparkle")
                             }
-                            .disabled(projects.project == nil)
+                            .tint(promptOpen ? .accentColor : nil)
+                            .disabled(aiAvailable == false)
                         }
                         ToolbarItem(placement: .primaryAction) {
                             Button {
-                                startNewProject()
+                                showSettings = true
                             } label: {
-                                Image(systemName: "folder.badge.plus")
+                                Image(systemName: "gearshape")
                             }
                         }
                     }
@@ -70,8 +73,17 @@
             .alert("New Document", isPresented: $showAddFile) { newFilePrompt }
             .alert("Rename Document", isPresented: renameBinding) { renamePrompt }
             .alert("Rename Project", isPresented: renameProjectBinding) { renameProjectPrompt }
-            .onAppear(perform: expandOpenProject)
-            .onChange(of: projects.project) { _ in expandOpenProject() }
+            .sheet(isPresented: $showSettings) { TouchSettingsView() }
+            .onAppear {
+                chat.activate(projects.project)
+                expandOpenProject()
+                checkAI()
+            }
+            .onChange(of: projects.project) { project in
+                chat.activate(project)
+                expandOpenProject()
+            }
+            .onChange(of: settings.aiSignature) { _ in checkAI() }
         }
 
         // MARK: - Text prompts (New / Rename)
@@ -144,9 +156,15 @@
             .listStyle(.sidebar)
             .overlay {
                 if projects.projects.isEmpty {
-                    EmptyState("No projects yet —\ntap + to create one", icon: "folder")
-                        .allowsHitTesting(false)
+                    EmptyState("No projects yet —\ntap to create one", icon: "folder")
+                        .contentShape(Rectangle())
+                        .onTapGesture { startNewProject() }
                 }
+            }
+            // Long-press the sidebar background to add a project (like the Mac
+            // sidebar's right-click menu). New Document lives on each project's menu.
+            .contextMenu {
+                Button("New Project") { startNewProject() }
             }
         }
 
@@ -237,24 +255,41 @@
 
         @ViewBuilder
         private var detail: some View {
-            if projects.project == nil {
-                EmptyState("Create or select a project to begin", icon: "folder")
-            } else if let file = projects.selected {
-                TouchEditorView(
-                    docID: file.id,
-                    markdown: projects.text(of: file),
-                    editable: true,
-                    fileURL: file.url,
-                    projectRoot: projects.project?.root,
-                    onSave: { text in projects.save(text, to: file) }
-                )
-                // Keep full height when the keyboard shows — the editor handles the
-                // caret inset itself (see setBottomInset), so avoid double-compensating.
-                .ignoresSafeArea(.container, edges: .bottom)
-                .ignoresSafeArea(.keyboard, edges: .bottom)
-            } else {
-                EmptyState("Select or add a document", icon: "doc.text")
+            Group {
+                if projects.project == nil {
+                    EmptyState("Create or select a project to begin", icon: "folder")
+                } else if let file = projects.selected {
+                    TouchEditorView(
+                        // `editorReload` bumps after an agent turn so the editor
+                        // re-reads files the agent may have changed.
+                        docID: "\(file.id)#\(editorReload)",
+                        markdown: projects.text(of: file),
+                        editable: !chat.working,
+                        fileURL: file.url,
+                        projectRoot: projects.project?.root,
+                        onSave: { text in projects.save(text, to: file) }
+                    )
+                    // Keep full height when the keyboard shows — the editor handles the
+                    // caret inset itself (see setBottomInset), so avoid double-compensating.
+                    .ignoresSafeArea(.container, edges: .bottom)
+                    .ignoresSafeArea(.keyboard, edges: .bottom)
+                } else {
+                    EmptyState("Select or add a document", icon: "doc.text")
+                }
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if promptOpen, projects.project != nil, aiAvailable != false {
+                    TouchAIBar(
+                        disabled: projects.selected == nil,
+                        onSubmit: send,
+                        onCancel: cancelTurn,
+                        onNewSession: startNewSession,
+                        canStartNewSession: chat.canStartNewSession(in: projects.project)
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: promptOpen)
         }
 
         // MARK: - Actions
@@ -268,6 +303,43 @@
             addFileProject = project ?? projects.project
             addFileTitle = ""
             showAddFile = true
+        }
+
+        // MARK: - AI
+
+        /// Probe the configured backend; if unavailable, close the AI bar so its
+        /// disabled toggle doesn't leave a dead bar on screen.
+        private func checkAI() {
+            Task.detached {
+                let available = Agent.current.isAvailable()
+                await MainActor.run {
+                    aiAvailable = available
+                    if !available { promptOpen = false }
+                }
+            }
+        }
+
+        /// Send one instruction over the open project. iOS has no caret context, so
+        /// the agent gets the open file as focus with an empty selection.
+        private func send(_ prompt: String) {
+            let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty, let project = projects.project, !chat.working else { return }
+            chat.send(
+                text, in: project, focus: projects.selected, selection: EditorSelectionContext()
+            ) {
+                projects.refresh()
+                editorReload += 1
+            }
+        }
+
+        private func cancelTurn() {
+            guard let project = projects.project else { return }
+            chat.cancel(in: project)
+        }
+
+        private func startNewSession() {
+            guard let project = projects.project else { return }
+            chat.newSession(in: project)
         }
 
         private var renameBinding: Binding<Bool> {

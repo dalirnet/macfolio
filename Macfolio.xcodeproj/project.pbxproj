@@ -23,12 +23,16 @@
 		AF000000000000000000000F /* Shell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Shell.swift; path = Sources/Utils/Shell.swift; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000010 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Theme.swift; path = Sources/Utils/Theme.swift; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000011 /* AIPromptBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AIPromptBar.swift; path = Sources/Views/AIPromptBar.swift; sourceTree = SOURCE_ROOT; };
-		AF0000000000000000000012 /* AccessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AccessView.swift; path = Sources/Views/AccessView.swift; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000013 /* DialogField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DialogField.swift; path = Sources/Views/DialogField.swift; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000014 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MainView.swift; path = Sources/Views/MainView.swift; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000015 /* SettingsDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SettingsDialog.swift; path = Sources/Views/SettingsDialog.swift; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000016 /* TouchMainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TouchMainView.swift; path = Sources/Touch/TouchMainView.swift; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000017 /* TouchEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TouchEditorView.swift; path = Sources/Touch/TouchEditorView.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000060 /* EditorSelectionContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EditorSelectionContext.swift; path = Sources/Models/EditorSelectionContext.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000061 /* AgentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AgentService.swift; path = Sources/Services/AgentService.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000062 /* OpenAIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OpenAIService.swift; path = Sources/Services/OpenAIService.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000063 /* TouchAIBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TouchAIBar.swift; path = Sources/Touch/TouchAIBar.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000064 /* TouchSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TouchSettingsView.swift; path = Sources/Touch/TouchSettingsView.swift; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000018 /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fonts; path = Resources/Fonts; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000019 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; name = AppIcon.icns; path = Resources/AppIcon.icns; sourceTree = SOURCE_ROOT; };
 		AF000000000000000000001A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = Resources/Info.plist; sourceTree = SOURCE_ROOT; };
@@ -59,12 +63,21 @@
 		AF0000000000000000000033 /* Shell.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF000000000000000000000F /* Shell.swift */; };
 		AF0000000000000000000034 /* Theme.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000010 /* Theme.swift */; };
 		AF0000000000000000000035 /* AIPromptBar.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000011 /* AIPromptBar.swift */; };
-		AF0000000000000000000036 /* AccessView.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000012 /* AccessView.swift */; };
 		AF0000000000000000000037 /* DialogField.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000013 /* DialogField.swift */; };
 		AF0000000000000000000038 /* MainView.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000014 /* MainView.swift */; };
 		AF0000000000000000000039 /* SettingsDialog.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000015 /* SettingsDialog.swift */; };
 		AF000000000000000000003A /* TouchMainView.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000016 /* TouchMainView.swift */; };
 		AF000000000000000000003B /* TouchEditorView.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000017 /* TouchEditorView.swift */; };
+		AF0000000000000000000070 /* EditorSelectionContext.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000060 /* EditorSelectionContext.swift */; };
+		AF0000000000000000000071 /* AgentService.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000061 /* AgentService.swift */; };
+		AF0000000000000000000072 /* OpenAIService.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000062 /* OpenAIService.swift */; };
+		AF0000000000000000000080 /* EditorSelectionContext.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000060 /* EditorSelectionContext.swift */; };
+		AF0000000000000000000081 /* AgentService.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000061 /* AgentService.swift */; };
+		AF0000000000000000000082 /* OpenAIService.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000062 /* OpenAIService.swift */; };
+		AF0000000000000000000083 /* ChatStore.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000008 /* ChatStore.swift */; };
+		AF0000000000000000000084 /* SettingsStore.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF000000000000000000000B /* SettingsStore.swift */; };
+		AF0000000000000000000085 /* TouchAIBar.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000063 /* TouchAIBar.swift */; };
+		AF0000000000000000000086 /* TouchSettingsView.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000064 /* TouchSettingsView.swift */; };
 		AF000000000000000000003C /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000018 /* Fonts */; };
 		AF000000000000000000003D /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000019 /* AppIcon.icns */; };
 		AF000000000000000000003E /* Fonts in Resources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000018 /* Fonts */; };
@@ -89,12 +102,16 @@
 				AF000000000000000000000F /* Shell.swift */,
 				AF0000000000000000000010 /* Theme.swift */,
 				AF0000000000000000000011 /* AIPromptBar.swift */,
-				AF0000000000000000000012 /* AccessView.swift */,
 				AF0000000000000000000013 /* DialogField.swift */,
 				AF0000000000000000000014 /* MainView.swift */,
 				AF0000000000000000000015 /* SettingsDialog.swift */,
 				AF0000000000000000000016 /* TouchMainView.swift */,
 				AF0000000000000000000017 /* TouchEditorView.swift */,
+				AF0000000000000000000060 /* EditorSelectionContext.swift */,
+				AF0000000000000000000061 /* AgentService.swift */,
+				AF0000000000000000000062 /* OpenAIService.swift */,
+				AF0000000000000000000063 /* TouchAIBar.swift */,
+				AF0000000000000000000064 /* TouchSettingsView.swift */,
 			);
 			name = Sources;
 			sourceTree = "<group>";
@@ -149,10 +166,12 @@
 				AF0000000000000000000033,
 				AF0000000000000000000034,
 				AF0000000000000000000035,
-				AF0000000000000000000036,
 				AF0000000000000000000037,
 				AF0000000000000000000038,
 				AF0000000000000000000039,
+				AF0000000000000000000070,
+				AF0000000000000000000071,
+				AF0000000000000000000072,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -186,6 +205,13 @@
 				AF000000000000000000002B,
 				AF000000000000000000003A,
 				AF000000000000000000003B,
+				AF0000000000000000000080,
+				AF0000000000000000000081,
+				AF0000000000000000000082,
+				AF0000000000000000000083,
+				AF0000000000000000000084,
+				AF0000000000000000000085,
+				AF0000000000000000000086,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
