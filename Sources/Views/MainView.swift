@@ -35,6 +35,9 @@ struct MainView: View {
     /// The pending "jump to match" for the editor, set when opening a search
     /// result. Each request bumps the token so repeats (same file + query) fire.
     @State private var findRequest: EditorFindRequest?
+    /// Whether the Claude Code CLI is installed and runnable. Gates the AI bar;
+    /// checked once on appear (nil = not yet determined).
+    @State private var aiAvailable: Bool?
 
     var body: some View {
         NavigationSplitView {
@@ -45,21 +48,7 @@ struct MainView: View {
                 .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle(windowTitle)
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    promptOpen.toggle()
-                } label: {
-                    Image(systemName: "sparkle")
-                        .foregroundStyle(promptOpen ? Color.accentColor : Color.primary)
-                }
-                Button {
-                    SettingsDialog.present()
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-            }
-        }
+        .toolbar { toolbar }
         .alert("New Project", isPresented: $showNewProject) { newProjectPrompt }
         .alert("New Document", isPresented: $showAddFile) { newFilePrompt }
         .alert("Rename Document", isPresented: renameBinding) { renamePrompt }
@@ -77,6 +66,7 @@ struct MainView: View {
         .onAppear {
             chat.activate(projects.project)
             expandOpenProject()
+            checkAI()
         }
         .onChange(of: projects.project) { project in
             chat.activate(project)
@@ -91,6 +81,29 @@ struct MainView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .openSearch)) { _ in
             showSearch = true
+        }
+    }
+
+    // MARK: - Toolbar
+
+    /// Primary-action toolbar: the AI-bar toggle (only when Claude Code is
+    /// available) and Settings.
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .primaryAction) {
+            if aiAvailable != false {
+                Button {
+                    promptOpen.toggle()
+                } label: {
+                    Image(systemName: "sparkle")
+                        .foregroundStyle(promptOpen ? Color.accentColor : Color.primary)
+                }
+            }
+            Button {
+                SettingsDialog.present()
+            } label: {
+                Image(systemName: "gearshape")
+            }
         }
     }
 
@@ -241,6 +254,18 @@ struct MainView: View {
 
     private func expandOpenProject() {
         if let id = projects.project?.id { expandedProjects.insert(id) }
+    }
+
+    /// Probe for the Claude Code CLI; if it's missing, close the AI bar so the
+    /// disabled toggle doesn't leave a dead bar on screen.
+    private func checkAI() {
+        Task.detached {
+            let available = ClaudeService.shared.isAvailable()
+            await MainActor.run {
+                aiAvailable = available
+                if !available { promptOpen = false }
+            }
+        }
     }
 
     private func selectNode(_ node: SidebarNode?) {
