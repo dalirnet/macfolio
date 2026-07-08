@@ -2,11 +2,12 @@
 
 **Mac** + **Folio** — a leaf of a book
 
-**Write books and articles with Claude Code as your co-author — on your Mac, in your language.**
+**Write books and articles with Claude as your co-author — on your Mac or iPad, in your language.**
 
-Macfolio is a native macOS authoring studio built on top of the Claude Code CLI. It turns your
-already-installed `claude` binary into a co-writer that drafts and revises your manuscript's chapters
-as plain Markdown files in a folder you own — no new login, no web panel, right-to-left first.
+Macfolio is a native authoring studio for **macOS and iPad**. It turns Claude into a co-writer that
+drafts and revises your manuscript's chapters as plain Markdown files in a folder you own. On the Mac
+it can ride the Claude Code CLI you already have — no new login, no web panel — or you can point it at
+your own **Claude API** or **OpenAI** key; on iPad, an API key is all it needs. Right-to-left first.
 
 ![Macfolio](screenshot.png)
 
@@ -16,8 +17,9 @@ Right-to-left first — Persian and English mix freely, per paragraph:
 
 ## Why Macfolio
 
-- **No new account, no new subscription.** It rides on the Claude Code you already have. Open the app
-  and start writing — there is no sign-in screen.
+- **Use what you have, or bring a key.** On the Mac it rides the Claude Code CLI you already have, so
+  there's no sign-in screen — or point it at your own **Claude API** or **OpenAI** key in Settings.
+  On iPad, an API key is all you need.
 - **Your book is just a folder.** Every chapter is a `.md` file under `~/Documents/Macfolio`. Plain
   text you can grep, back up, version with git, or open in any other editor. Nothing is locked in a
   database or a cloud.
@@ -30,9 +32,9 @@ Right-to-left first — Persian and English mix freely, per paragraph:
 
 ### Write
 
-- **Lexical WYSIWYG editor** — headings, **bold**/*italic*, bullet and numbered lists, quotes, fenced
+- **Lexical WYSIWYG editor** — headings, **bold**/_italic_, bullet and numbered lists, quotes, fenced
   code blocks, tables, links, and images, all rendered inline as you type.
-- **Markdown typing shortcuts** — `#`, `-`, `>`, `` ``` ``, and friends transform on the fly, so your
+- **Markdown typing shortcuts** — `#`, `-`, `>`, ` ``` `, and friends transform on the fly, so your
   hands never leave the keyboard.
 - **Automatic RTL** via `dir="auto"` on every paragraph, with the bundled **Dana** font (Persian +
   English) for a consistent look across any Mac.
@@ -45,8 +47,9 @@ Right-to-left first — Persian and English mix freely, per paragraph:
   to the agent, so “expand this”, “rewrite the selection”, or “remove this line” just work.
 - **Progress you can watch.** The chat footer streams the co-author's work as a live checklist, and
   shows the **token usage** for each turn right under the reply.
-- **Per-book memory.** Each book keeps its own persistent Claude Code session, so the co-author has
-  your whole manuscript in context — switch books and the conversation follows.
+- **Per-book memory.** Each book keeps its own conversation context, so the co-author has your whole
+  manuscript in mind — switch books and it follows. (A persistent CLI session with Claude Code; kept
+  per book in the app with the API backends.)
 - **Start fresh anytime.** One click resets the session, clearing prior context for a clean slate.
 
 ### Organize
@@ -58,16 +61,23 @@ Right-to-left first — Persian and English mix freely, per paragraph:
 
 ### Fits right in
 
-- **Native and lightweight.** A universal SwiftUI/AppKit app — no Electron.
-- **Follows your Mac.** Honors the macOS system accent color and light/dark appearance.
-- **Local only.** Nothing appears in the Claude web panel; your manuscript stays on disk.
+- **Native and lightweight.** A native SwiftUI app for macOS and iPad — no Electron.
+- **Follows your system.** Honors the system accent color and light/dark appearance.
+- **Local first.** Your manuscript stays on disk; with Claude Code nothing appears in the web panel.
 
-## Models & control
+## AI backend & control
 
-Pick the model and how much freedom the co-author has, in **Settings**:
+Choose your co-author in **Settings**:
 
-- **Model** — Claude **Opus 4.8**, **Sonnet 5**, or **Haiku 4.5**.
-- **Permission mode** — **Bypass** (no prompts, the default), **Accept Edits**, or **Plan**.
+- **Provider** — **Claude Code** (the local CLI, macOS only), the **Claude API**, or **OpenAI**.
+- **Model** — Claude **Opus 4.8** / **Sonnet 5** / **Haiku 4.5**, or OpenAI **GPT-4o** / **GPT-4.1**
+  (and their mini variants).
+- **Permission mode** _(Claude Code only)_ — **Bypass** (no prompts, the default), **Accept Edits**,
+  or **Plan**.
+
+The Claude API and OpenAI backends have no file tools of their own, so Macfolio runs the editing loop
+for them — the model calls read/write/edit tools against your book's `.md` files until the change is
+done.
 
 ## Build
 
@@ -79,8 +89,13 @@ Pick the model and how much freedom the co-author has, in **Settings**:
 installing npm deps on first run) and embeds it in the app. If npm is unavailable, the manuscript
 pane falls back to a read-only preview, so the app still runs — you just can't edit in place yet.
 
+The iPad app builds from `Macfolio.xcodeproj` (the **Macfolio (iOS)** target) in Xcode.
+
 ## Requirements
 
-- macOS 13+
-- [Claude Code CLI](https://docs.claude.com/en/docs/claude-code/setup) installed and authenticated
+- macOS 13+, or iPadOS 16+
+- An AI backend — one of:
+    - the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code/setup), installed and
+      authenticated (macOS only), or
+    - a **Claude API** or **OpenAI** API key
 - Node.js 18+ (only to build the editor bundle)
