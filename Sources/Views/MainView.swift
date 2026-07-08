@@ -44,6 +44,7 @@ struct MainView: View {
             detail
                 .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
         }
+        .navigationTitle(windowTitle)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -146,6 +147,16 @@ struct MainView: View {
             }
         }
         Button("Cancel", role: .cancel) {}
+    }
+
+    /// Window title: `Project / Document` for what's open, falling back to the
+    /// project alone, then the app name when nothing is open.
+    private var windowTitle: String {
+        guard let project = projects.project else { return "Macfolio" }
+        if let file = projects.selected {
+            return "\(project.title) / \(file.title)"
+        }
+        return project.title
     }
 
     // MARK: - Sidebar tree (projects › files)
