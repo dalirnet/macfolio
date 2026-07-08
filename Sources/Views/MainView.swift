@@ -7,6 +7,7 @@ import SwiftUI
 struct MainView: View {
     @ObservedObject private var projects = ProjectStore.shared
     @ObservedObject private var chat = ChatStore.shared
+    @ObservedObject private var settings = SettingsStore.shared
 
     @State private var promptOpen = true
     /// Live height of the floating AI bar, used to inset the editor's bottom.
@@ -47,7 +48,7 @@ struct MainView: View {
             detail
                 .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationTitle(windowTitle)
+        .navigationTitle(projects.windowTitle)
         .toolbar { toolbar }
         .alert("New Project", isPresented: $showNewProject) { newProjectPrompt }
         .alert("New Document", isPresented: $showAddFile) { newFilePrompt }
@@ -76,6 +77,10 @@ struct MainView: View {
             // Drop the previous file's selection; the editor re-reports on load.
             selection = EditorSelectionContext()
         }
+        .onChange(of: settings.aiSignature) { _ in
+            // Switching provider or editing its config may flip availability.
+            checkAI()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .newProject)) { _ in
             startNewProject()
         }
@@ -86,19 +91,19 @@ struct MainView: View {
 
     // MARK: - Toolbar
 
-    /// Primary-action toolbar: the AI-bar toggle (only when Claude Code is
-    /// available) and Settings.
+    /// Primary-action toolbar: the AI-bar toggle (disabled when no AI backend is
+    /// configured) and Settings.
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            if aiAvailable != false {
-                Button {
-                    promptOpen.toggle()
-                } label: {
-                    Image(systemName: "sparkle")
-                        .foregroundStyle(promptOpen ? Color.accentColor : Color.primary)
-                }
+            Button {
+                promptOpen.toggle()
+            } label: {
+                Image(systemName: "sparkle")
+                    .foregroundStyle(promptOpen ? Color.accentColor : Color.primary)
             }
+            .disabled(aiAvailable == false)
+            .help(aiAvailable == false ? "AI backend not configured" : "")
             Button {
                 SettingsDialog.present()
             } label: {
@@ -160,16 +165,6 @@ struct MainView: View {
             }
         }
         Button("Cancel", role: .cancel) {}
-    }
-
-    /// Window title: `Project / Document` for what's open, falling back to the
-    /// project alone, then the app name when nothing is open.
-    private var windowTitle: String {
-        guard let project = projects.project else { return "Macfolio" }
-        if let file = projects.selected {
-            return "\(project.title) / \(file.title)"
-        }
-        return project.title
     }
 
     // MARK: - Sidebar tree (projects › files)
@@ -260,7 +255,7 @@ struct MainView: View {
     /// disabled toggle doesn't leave a dead bar on screen.
     private func checkAI() {
         Task.detached {
-            let available = ClaudeService.shared.isAvailable()
+            let available = Agent.current.isAvailable()
             await MainActor.run {
                 aiAvailable = available
                 if !available { promptOpen = false }

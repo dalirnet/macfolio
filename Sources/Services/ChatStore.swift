@@ -82,13 +82,13 @@ final class ChatStore: ObservableObject {
     /// Whether there's a conversation to reset (a session or a shown reply).
     func canStartNewSession(in project: Project?) -> Bool {
         guard let project else { return false }
-        return byProject[project.id]?.reply != nil || SessionStore.shared.hasSession(for: project)
+        return byProject[project.id]?.reply != nil || Agent.current.hasSession(for: project)
     }
 
     /// Start a fresh conversation: forget the project's session and clear its slot
     /// (reply + token usage), so the next prompt has no prior context.
     func newSession(in project: Project) {
-        SessionStore.shared.clearSession(for: project)
+        Agent.current.clearSession(for: project)
         update(project.id) { $0 = Turn() }
     }
 
@@ -111,7 +111,7 @@ final class ChatStore: ObservableObject {
             // `for await` on the main actor keeps the ordered stream in order — the
             // reply's text deltas can't scramble. Cancelling this task ends the
             // stream, which terminates the CLI process (see ClaudeService.run).
-            for await event in ClaudeService.shared.run(framed, in: project) {
+            for await event in Agent.current.run(framed, in: project) {
                 switch event {
                 case .step(let step):
                     self?.update(id) { $0.activity.append(step) }
@@ -147,7 +147,7 @@ final class ChatStore: ObservableObject {
     ) -> String {
         var context = ""
         if let file {
-            let path = relativePath(of: file.url, in: project)
+            let path = project.relativePath(of: file.url)
             context = """
                 The user currently has this file open in the editor: `\(path)`. Treat it as
                 the focus of the request unless they clearly mean another file, and read it
@@ -187,13 +187,5 @@ final class ChatStore: ObservableObject {
 
             \(context)\(instruction)
             """
-    }
-
-    /// A path relative to the project root, for pointing the agent at the open file.
-    private func relativePath(of url: URL, in project: Project) -> String {
-        let root = project.root.standardizedFileURL.path
-        let path = url.standardizedFileURL.path
-        guard path.hasPrefix(root) else { return url.lastPathComponent }
-        return String(path.dropFirst(root.count).drop { $0 == "/" })
     }
 }

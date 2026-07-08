@@ -54,11 +54,49 @@ enum DialogField {
         return field
     }
 
+    static func secureField(_ value: String) -> NSSecureTextField {
+        let field = NSSecureTextField(string: value)
+        field.translatesAutoresizingMaskIntoConstraints = false
+        field.widthAnchor.constraint(equalToConstant: width).isActive = true
+        return field
+    }
+
     static func popup(_ titles: [String]) -> NSPopUpButton {
         let popup = NSPopUpButton()
         popup.translatesAutoresizingMaskIntoConstraints = false
         popup.addItems(withTitles: titles)
         popup.widthAnchor.constraint(equalToConstant: width).isActive = true
         return popup
+    }
+
+    /// A popup that reports its selection changes — used to switch which fields
+    /// show below it. It's its own target, so the callback survives (NSControl's
+    /// `target` is weak).
+    final class CallbackPopUp: NSPopUpButton {
+        var onChange: (() -> Void)?
+        @objc private func fire() { onChange?() }
+        func trackChanges() {
+            target = self
+            action = #selector(fire)
+        }
+    }
+
+    static func callbackPopup(_ titles: [String]) -> CallbackPopUp {
+        let popup = CallbackPopUp()
+        popup.translatesAutoresizingMaskIntoConstraints = false
+        popup.addItems(withTitles: titles)
+        popup.widthAnchor.constraint(equalToConstant: width).isActive = true
+        popup.trackChanges()
+        return popup
+    }
+
+    /// A vertical group of labelled fields, so a whole section can be shown or
+    /// hidden as one (`isHidden`) inside an accessory.
+    static func section(_ fields: [NSView]) -> NSStackView {
+        let stack = NSStackView(views: fields)
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 12
+        return stack
     }
 }

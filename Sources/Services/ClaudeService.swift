@@ -1,26 +1,5 @@
 import Foundation
 
-/// One turn's token usage, reported by the CLI's final `result` message.
-/// `inputTokens` is the *new* (uncached) input — it excludes the CLI's cached
-/// system prompt + tool schemas (~25k, sent every turn), which would otherwise
-/// dwarf the real usage.
-struct AgentUsage: Equatable {
-    var inputTokens: Int
-    var outputTokens: Int
-}
-
-/// One update from a running turn, delivered in order over an `AsyncStream`.
-enum TurnEvent {
-    /// A short "what it's doing now" line (reading/writing a file, searching).
-    case step(String)
-    /// A new reply text block began — clear any previously streamed live text.
-    case replyReset
-    /// A chunk of the assistant's reply text, as it's generated.
-    case replyDelta(String)
-    /// The turn finished: the authoritative final reply and its token usage.
-    case finished(reply: String?, usage: AgentUsage?)
-}
-
 /// Holds the running `Process` so a cancelled turn can terminate it, coping with
 /// the race where cancellation arrives before the process has started.
 private final class ProcessBox {
@@ -49,12 +28,22 @@ private final class ProcessBox {
 /// Auth is inherited from the user's already-logged-in `claude` binary — no
 /// sign-in of our own. Each project keeps one persistent session (see
 /// `SessionStore`) so the agent retains whole-project context across turns.
-final class ClaudeService {
+final class ClaudeService: AgentService {
     static let shared = ClaudeService()
 
     private(set) var executablePath: String?
 
     private init() {}
+
+    // MARK: - Session (delegated to the persistent per-project session)
+
+    func hasSession(for project: Project) -> Bool {
+        SessionStore.shared.hasSession(for: project)
+    }
+
+    func clearSession(for project: Project) {
+        SessionStore.shared.clearSession(for: project)
+    }
 
     // MARK: - Locating the CLI
 
@@ -248,7 +237,9 @@ final class ClaudeService {
     private func describe(_ toolUse: [String: Any], project: Project) -> String {
         let name = toolUse["name"] as? String ?? "tool"
         let input = toolUse["input"] as? [String: Any] ?? [:]
-        let path = (input["file_path"] as? String).map { relative($0, to: project) }
+        let path = (input["file_path"] as? String).map {
+            project.relativePath(of: URL(fileURLWithPath: $0))
+        }
 
         switch name {
         case "Read": return "reading \(path ?? "file")"
@@ -259,12 +250,5 @@ final class ClaudeService {
         case "TodoWrite": return "planning"
         default: return name.lowercased()
         }
-    }
-
-    /// A path relative to the project root, for compact display.
-    private func relative(_ path: String, to project: Project) -> String {
-        let root = project.root.path
-        guard path.hasPrefix(root) else { return (path as NSString).lastPathComponent }
-        return String(path.dropFirst(root.count).drop { $0 == "/" })
     }
 }

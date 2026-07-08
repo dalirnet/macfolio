@@ -5,6 +5,16 @@ struct Project: Identifiable, Hashable {
     let root: URL
     var title: String
     var id: String { root.path }
+
+    /// A path relative to the project root — for compact display and for pointing
+    /// the agent at a file. Falls back to the last component for anything outside
+    /// the project.
+    func relativePath(of url: URL) -> String {
+        let rootPath = root.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        guard path.hasPrefix(rootPath) else { return url.lastPathComponent }
+        return String(path.dropFirst(rootPath.count).drop { $0 == "/" })
+    }
 }
 
 /// A single Markdown file inside a project.

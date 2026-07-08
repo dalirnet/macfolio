@@ -1,13 +1,59 @@
 import Combine
 import Foundation
 
-/// App settings: the model and Claude Code permission mode the agent runs with.
-/// Persisted to `~/.config/macfolio/settings.json`.
+/// App settings: which AI backend co-authors the project, and its configuration.
+/// Three backends: the Claude Code CLI (agentic, with its own file tools), the
+/// Claude API, and OpenAI — the latter two hosted through one OpenAI-compatible
+/// chat loop against fixed endpoints. Persisted to `~/.config/macfolio/settings.json`.
 final class SettingsStore: ObservableObject {
     static let shared = SettingsStore()
 
+    @Published var provider: Provider { didSet { save() } }
+
+    // Claude model, shared by the Claude Code CLI and the Claude API.
     @Published var model: Model { didSet { save() } }
+    // Claude Code only — the CLI's file-tool permission mode.
     @Published var permissionMode: PermissionMode { didSet { save() } }
+
+    // API backends: a key each, and OpenAI's model.
+    @Published var claudeAPIKey: String { didSet { save() } }
+    @Published var openAIKey: String { didSet { save() } }
+    @Published var openAIModel: OpenAIModel { didSet { save() } }
+
+    /// The co-authoring backend.
+    enum Provider: String, CaseIterable, Identifiable, Codable {
+        case claudeCode
+        case claudeAPI
+        case openAI
+
+        var id: String { rawValue }
+        var displayName: String {
+            switch self {
+            case .claudeCode: return "Claude Code"
+            case .claudeAPI: return "Claude API"
+            case .openAI: return "OpenAI"
+            }
+        }
+    }
+
+    /// Providers offered on this platform. The Claude Code CLI is macOS-only, so
+    /// iOS shows the two API backends.
+    static var availableProviders: [Provider] {
+        #if os(macOS)
+            return Provider.allCases
+        #else
+            return [.claudeAPI, .openAI]
+        #endif
+    }
+
+    /// The default backend when there's no saved setting.
+    static var defaultProvider: Provider {
+        #if os(macOS)
+            return .claudeCode
+        #else
+            return .claudeAPI
+        #endif
+    }
 
     enum Model: String, CaseIterable, Identifiable, Codable {
         case opus = "claude-opus-4-8"
@@ -20,6 +66,23 @@ final class SettingsStore: ObservableObject {
             case .opus: return "Claude Opus 4.8"
             case .sonnet: return "Claude Sonnet 5"
             case .haiku: return "Claude Haiku 4.5"
+            }
+        }
+    }
+
+    enum OpenAIModel: String, CaseIterable, Identifiable, Codable {
+        case gpt4o = "gpt-4o"
+        case gpt4oMini = "gpt-4o-mini"
+        case gpt41 = "gpt-4.1"
+        case gpt41Mini = "gpt-4.1-mini"
+
+        var id: String { rawValue }
+        var displayName: String {
+            switch self {
+            case .gpt4o: return "GPT-4o"
+            case .gpt4oMini: return "GPT-4o mini"
+            case .gpt41: return "GPT-4.1"
+            case .gpt41Mini: return "GPT-4.1 mini"
             }
         }
     }
@@ -43,39 +106,62 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    /// A value that changes whenever the *availability* of the chosen backend
+    /// might change, so the UI can re-check (show/hide the AI bar) on any edit.
+    var aiSignature: String {
+        "\(provider.rawValue)|\(claudeAPIKey.isEmpty ? "0" : "1")|\(openAIKey.isEmpty ? "0" : "1")"
+    }
+
     private var loading = true
     private static let file = Paths.support("settings.json")
 
     private struct Snapshot: Codable {
+        var provider: Provider
         var model: Model
         var permissionMode: PermissionMode
+        var claudeAPIKey: String
+        var openAIKey: String
+        var openAIModel: OpenAIModel
 
-        init(model: Model, permissionMode: PermissionMode) {
-            self.model = model
-            self.permissionMode = permissionMode
+        init(_ store: SettingsStore) {
+            provider = store.provider
+            model = store.model
+            permissionMode = store.permissionMode
+            claudeAPIKey = store.claudeAPIKey
+            openAIKey = store.openAIKey
+            openAIModel = store.openAIModel
         }
 
         // Lenient: missing keys (older settings files) fall back to defaults.
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
+            provider =
+                (try? c.decode(Provider.self, forKey: .provider)) ?? SettingsStore.defaultProvider
             model = (try? c.decode(Model.self, forKey: .model)) ?? .opus
             permissionMode =
                 (try? c.decode(PermissionMode.self, forKey: .permissionMode)) ?? .bypassPermissions
+            claudeAPIKey = (try? c.decode(String.self, forKey: .claudeAPIKey)) ?? ""
+            openAIKey = (try? c.decode(String.self, forKey: .openAIKey)) ?? ""
+            openAIModel = (try? c.decode(OpenAIModel.self, forKey: .openAIModel)) ?? .gpt4o
         }
     }
 
     private init() {
         let snapshot = Self.read()
+        let saved = snapshot?.provider ?? Self.defaultProvider
+        // A settings file synced from macOS may name Claude Code, which iOS can't
+        // run — fall back to the platform default so the picker stays valid.
+        provider = Self.availableProviders.contains(saved) ? saved : Self.defaultProvider
         model = snapshot?.model ?? .opus
         permissionMode = snapshot?.permissionMode ?? .bypassPermissions
+        claudeAPIKey = snapshot?.claudeAPIKey ?? ""
+        openAIKey = snapshot?.openAIKey ?? ""
+        openAIModel = snapshot?.openAIModel ?? .gpt4o
         loading = false
     }
 
     private func save() {
-        guard !loading,
-            let data = try? JSONEncoder().encode(
-                Snapshot(model: model, permissionMode: permissionMode))
-        else { return }
+        guard !loading, let data = try? JSONEncoder().encode(Snapshot(self)) else { return }
         try? data.write(to: Self.file)
     }
 

@@ -19,6 +19,14 @@ final class ProjectStore: ObservableObject {
         didSet { persistSelection() }
     }
 
+    /// The window/title-bar text: `Project / Document` for what's open, falling
+    /// back to the project alone, then the app name.
+    var windowTitle: String {
+        guard let project else { return "Macfolio" }
+        if let selected { return "\(project.title) / \(selected.title)" }
+        return project.title
+    }
+
     private static let key = "currentProjectPath"
     private static let fileKey = "currentFilePath"
 

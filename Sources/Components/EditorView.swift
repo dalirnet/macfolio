@@ -3,13 +3,6 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
 
-/// The caret's context in the editor, forwarded so an AI prompt can act on "the
-/// selection" or "this line". `blockText` is the paragraph/line the caret sits in.
-struct EditorSelectionContext: Equatable {
-    var selectedText = ""
-    var blockText = ""
-}
-
 /// A request to jump to text in the loaded document — the ⌘F search opens a
 /// result on its match. The `token` makes repeat requests for the same text fire.
 struct EditorFindRequest: Equatable {
