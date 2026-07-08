@@ -108,7 +108,7 @@ import SwiftUI
                         Image(systemName: "doc.text")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
-                        Text(highlighted(hit.file.title))
+                        Text(highlighted(hit.file.displayTitle))
                             .font(Theme.ui(13, .medium))
                             .lineLimit(1)
                         Text(hit.project.title)

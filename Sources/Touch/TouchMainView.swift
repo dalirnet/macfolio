@@ -18,6 +18,7 @@
         @State private var promptOpen = true
         @State private var aiAvailable: Bool?
         @State private var showSettings = false
+        @State private var metadataTarget: ProjectFile?
         /// Bumped after the agent edits files, to reload the editor from disk.
         @State private var editorReload = 0
 
@@ -74,6 +75,7 @@
             .alert("Rename Document", isPresented: renameBinding) { renamePrompt }
             .alert("Rename Project", isPresented: renameProjectBinding) { renameProjectPrompt }
             .sheet(isPresented: $showSettings) { TouchSettingsView() }
+            .sheet(item: $metadataTarget) { TouchMetadataView(file: $0) }
             .onAppear {
                 chat.activate(projects.project)
                 expandOpenProject()
@@ -173,7 +175,8 @@
             projects.projects.map { project in
                 let kids = (projects.filesByProject[project.id] ?? []).map {
                     SidebarNode(
-                        id: $0.id, title: $0.title, project: project, file: $0, children: nil)
+                        id: $0.id, title: $0.displayTitle, project: project, file: $0,
+                        children: nil)
                 }
                 return SidebarNode(
                     id: project.id, title: project.title, project: project, file: nil,
@@ -231,6 +234,7 @@
         @ViewBuilder
         private func nodeMenu(_ node: SidebarNode) -> some View {
             if let file = node.file {
+                Button("Metadata") { metadataTarget = file }
                 Button("Rename") {
                     renameTitle = file.title
                     renameTarget = file
@@ -263,7 +267,7 @@
                         // `editorReload` bumps after an agent turn so the editor
                         // re-reads files the agent may have changed.
                         docID: "\(file.id)#\(editorReload)",
-                        markdown: projects.text(of: file),
+                        markdown: projects.body(of: file),
                         editable: !chat.working,
                         fileURL: file.url,
                         projectRoot: projects.project?.root,

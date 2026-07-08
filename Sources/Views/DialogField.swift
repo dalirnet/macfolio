@@ -61,6 +61,16 @@ enum DialogField {
         return field
     }
 
+    /// A text field that accepts only whole numbers (no stepper arrows).
+    static func numberField(_ value: Int?) -> NSTextField {
+        let field = textField(value.map(String.init) ?? "")
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .none
+        formatter.allowsFloats = false
+        field.formatter = formatter
+        return field
+    }
+
     static func popup(_ titles: [String]) -> NSPopUpButton {
         let popup = NSPopUpButton()
         popup.translatesAutoresizingMaskIntoConstraints = false

@@ -20,8 +20,14 @@ struct Project: Identifiable, Hashable {
 /// A single Markdown file inside a project.
 struct ProjectFile: Identifiable, Hashable {
     let url: URL
+    /// The file's parsed frontmatter (empty when it has none). Loaded with the file.
+    var metadata = Frontmatter()
+
     var id: String { url.path }
 
-    /// Display name: the filename without its `.md` extension.
+    /// The filename without its `.md` extension — the file's identity for rename.
     var title: String { url.deletingPathExtension().lastPathComponent }
+
+    /// What the sidebar shows: the frontmatter title if set, else the filename.
+    var displayTitle: String { metadata.title.isEmpty ? title : metadata.title }
 }

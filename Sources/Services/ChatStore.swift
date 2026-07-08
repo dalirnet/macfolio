@@ -181,6 +181,11 @@ final class ChatStore: ObservableObject {
             organize `.md` files in this folder as needed. Write in the same language the user
             writes in and that existing files use; keep code and technical terms in English.
 
+            A file may begin with a Jekyll-style YAML frontmatter block fenced by `---` (title, order,
+            date, tags, and possibly others).
+            Preserve it — never remove or duplicate it; edit those fields only if the user asks. When
+            you create a new file, start it with a frontmatter block that at least sets `title`.
+
             When you finish, reply to the user with a short, plain-text confirmation — one or
             two sentences at most. Do NOT use Markdown in this reply: no headings, lists, code
             fences, bold, or links. The Markdown you author belongs in the files, not here.

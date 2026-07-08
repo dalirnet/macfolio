@@ -23,7 +23,7 @@ final class ProjectStore: ObservableObject {
     /// back to the project alone, then the app name.
     var windowTitle: String {
         guard let project else { return "Macfolio" }
-        if let selected { return "\(project.title) / \(selected.title)" }
+        if let selected { return "\(project.title) / \(selected.displayTitle)" }
         return project.title
     }
 
@@ -143,11 +143,27 @@ final class ProjectStore: ObservableObject {
         return
             items
             .filter { $0.pathExtension == "md" }
-            .sorted {
-                $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent)
-                    == .orderedAscending
+            .map { url in
+                let raw = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+                return ProjectFile(url: url, metadata: Frontmatter.split(raw).meta)
             }
-            .map { ProjectFile(url: $0) }
+            .sorted(by: Self.ordered)
+    }
+
+    /// Sidebar order: chapters with an explicit `order` first (ascending), then the
+    /// rest by date (oldest first), then by display title — so a book reads in the
+    /// sequence the author sets.
+    private static func ordered(_ a: ProjectFile, _ b: ProjectFile) -> Bool {
+        switch (a.metadata.order, b.metadata.order) {
+        case (let x?, let y?) where x != y: return x < y
+        case (nil, .some): return false
+        case (.some, nil): return true
+        default:
+            let da = a.metadata.date
+            let db = b.metadata.date
+            if !da.isEmpty, !db.isEmpty, da != db { return da < db }
+            return a.displayTitle.localizedStandardCompare(b.displayTitle) == .orderedAscending
+        }
     }
 
     private static let imageExtensions: Set<String> = [
@@ -171,12 +187,37 @@ final class ProjectStore: ObservableObject {
         }
     }
 
+    /// The whole raw file, frontmatter included.
     func text(of file: ProjectFile) -> String {
         (try? String(contentsOf: file.url, encoding: .utf8)) ?? ""
     }
 
-    func save(_ text: String, to file: ProjectFile) {
-        try? text.write(to: file.url, atomically: true, encoding: .utf8)
+    /// The editable body — the frontmatter block stripped off, since it's edited
+    /// through the metadata form, not the WYSIWYG editor.
+    func body(of file: ProjectFile) -> String {
+        Frontmatter.split(text(of: file)).body
+    }
+
+    /// The file's current frontmatter, read fresh from disk.
+    func metadata(of file: ProjectFile) -> Frontmatter {
+        Frontmatter.split(text(of: file)).meta
+    }
+
+    /// Save an edited body, preserving whatever frontmatter is on disk (which the
+    /// agent or the metadata form may have changed since load).
+    func save(_ body: String, to file: ProjectFile) {
+        let meta = metadata(of: file)
+        try? Frontmatter.join(meta, body: body).write(
+            to: file.url, atomically: true, encoding: .utf8)
+    }
+
+    /// Replace a file's frontmatter (keeping its body), then refresh so the
+    /// sidebar reflects any title/order change.
+    func updateMetadata(_ meta: Frontmatter, for file: ProjectFile) {
+        let body = body(of: file)
+        try? Frontmatter.join(meta, body: body).write(
+            to: file.url, atomically: true, encoding: .utf8)
+        reload(after: file, select: file.url)
     }
 
     // MARK: - File operations
@@ -190,7 +231,11 @@ final class ProjectStore: ObservableObject {
             url = target.root.appendingPathComponent("\(slugify(title))-\(n).md")
             n += 1
         }
-        try? "# \(title)\n\n".write(to: url, atomically: true, encoding: .utf8)
+        var meta = Frontmatter()
+        meta.title = title
+        meta.date = Frontmatter.today()
+        try? Frontmatter.join(meta, body: "# \(title)\n\n")
+            .write(to: url, atomically: true, encoding: .utf8)
         openProject(target)
         selected = files.first { $0.url == url }
         refreshProjects()

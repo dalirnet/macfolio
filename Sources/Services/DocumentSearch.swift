@@ -17,8 +17,8 @@ enum DocumentSearch {
         var bodyHits: [SearchHit] = []
         for project in store.projects {
             for file in store.filesByProject[project.id] ?? [] {
-                let titleMatch = file.title.range(of: q, options: .caseInsensitive) != nil
-                let excerpt = excerpt(from: store.text(of: file), query: q)
+                let titleMatch = file.displayTitle.range(of: q, options: .caseInsensitive) != nil
+                let excerpt = excerpt(from: store.body(of: file), query: q)
                 guard titleMatch || !excerpt.isEmpty else { continue }
                 let hit = SearchHit(project: project, file: file, snippet: excerpt)
                 if titleMatch { titleHits.append(hit) } else { bodyHits.append(hit) }

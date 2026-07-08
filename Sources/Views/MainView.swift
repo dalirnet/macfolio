@@ -211,7 +211,8 @@ struct MainView: View {
     private var nodes: [SidebarNode] {
         projects.projects.map { project in
             let kids = (projects.filesByProject[project.id] ?? []).map {
-                SidebarNode(id: $0.id, title: $0.title, project: project, file: $0, children: nil)
+                SidebarNode(
+                    id: $0.id, title: $0.displayTitle, project: project, file: $0, children: nil)
             }
             return SidebarNode(
                 id: project.id, title: project.title, project: project, file: nil,
@@ -286,6 +287,7 @@ struct MainView: View {
     @ViewBuilder
     private func nodeMenu(_ node: SidebarNode) -> some View {
         if let file = node.file {
+            Button("Metadata") { MetadataDialog.present(file) }
             Button("Rename") {
                 renameTitle = file.title
                 renameTarget = file
@@ -340,7 +342,7 @@ struct MainView: View {
         if let file = projects.selected {
             EditorView(
                 docID: "\(file.id)#\(editorReload)",
-                markdown: projects.text(of: file),
+                markdown: projects.body(of: file),
                 editable: !chat.working,
                 fileURL: file.url,
                 projectRoot: projects.project?.root,
