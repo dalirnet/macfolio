@@ -26,6 +26,8 @@ struct AIPromptBar: View {
 
     let disabled: Bool
     let onSubmit: (String) -> Void
+    /// Stop the in-flight turn (the leading spinner becomes a stop button).
+    let onCancel: () -> Void
     /// Start a fresh agent session (clear its memory of this project).
     let onNewSession: () -> Void
     /// Whether there's a conversation to reset (drives the new-session button).
@@ -98,6 +100,7 @@ struct AIPromptBar: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .id(chat.activity.last)
                     .transition(.opacity)
+                stopButton
             } else {
                 // NSTextView-backed so Persian/Arabic type right-to-left naturally.
                 PromptTextField(
@@ -144,6 +147,18 @@ struct AIPromptBar: View {
             }
         }
         .frame(width: 18, height: 18)
+    }
+
+    /// Trailing stop button while a turn runs — cancels it. Sits in the same slot
+    /// the new-session button uses when idle.
+    private var stopButton: some View {
+        Button(action: onCancel) {
+            Image(systemName: "stop.fill")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help("Stop")
     }
 
     /// Trailing button to start a fresh session — clears the agent's memory of the

@@ -292,6 +292,7 @@ struct MainView: View {
                     AIPromptBar(
                         disabled: projects.selected == nil,
                         onSubmit: send,
+                        onCancel: cancelTurn,
                         onNewSession: startNewSession,
                         canStartNewSession: chat.canStartNewSession(in: projects.project)
                     )
@@ -354,15 +355,19 @@ struct MainView: View {
     private func send(_ prompt: String) {
         let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let project = projects.project, !chat.working else { return }
-        // @MainActor so the post-turn refresh + editor reload run on the main
-        // thread — otherwise the SwiftUI state changes don't propagate and the
-        // editor keeps showing the pre-edit content until you reopen the file.
-        Task { @MainActor in
-            // Pass the open file + caret context so the agent can act on "the
-            // selection" or "this line". The editor is locked while chat.working.
-            await chat.send(text, in: project, focus: projects.selected, selection: selection)
+        // Pass the open file + caret context so the agent can act on "the
+        // selection" or "this line". The editor is locked while chat.working.
+        // `onFinish` runs when the turn ends (or is cancelled) to reload edited
+        // files from disk — otherwise the editor shows the pre-edit content.
+        chat.send(text, in: project, focus: projects.selected, selection: selection) {
             projects.refresh()
-            editorReload += 1  // reload the file from disk after the agent's edits
+            editorReload += 1
         }
+    }
+
+    /// Stop the open project's in-flight agent turn.
+    private func cancelTurn() {
+        guard let project = projects.project else { return }
+        chat.cancel(in: project)
     }
 }
