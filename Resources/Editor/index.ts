@@ -857,6 +857,8 @@ function registerBlockToolbar(
     const unregister = mergeRegister(
         editor.registerEditableListener((editable) => {
             container.classList.toggle("mf-block-toolbar--disabled", !editable);
+            // Drive the whole editor's "agent is writing" locked look (see CSS).
+            document.body.classList.toggle("mf-agent-writing", !editable);
         }),
         editor.registerCommand(
             CAN_UNDO_COMMAND,
@@ -1575,6 +1577,62 @@ function reportSelection(): void {
 
 editor.registerUpdateListener(() => {
     reportSelection();
+});
+
+// --- Keep the caret visible while typing ---
+// The editor scrolls inside #app, but its bottom sits behind the floating AI bar
+// (a native overlay the WebView can't see) and its top behind the sticky
+// toolbar. The browser's own caret scrolling only keeps the caret within the
+// WebView, so at the bottom of a long document it lands hidden behind the bar.
+// After each edit, nudge the caret into the region between the toolbar and the
+// reserved bottom padding (which tracks the bar's height — see applyBottomInset).
+
+function scrollCaretIntoView(): void {
+    const root = editor.getRootElement();
+    if (!root || document.activeElement !== root) {
+        return;
+    }
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+        return;
+    }
+    const range = selection.getRangeAt(0).cloneRange();
+    range.collapse(false); // to the caret (focus edge)
+    let rect: DOMRect | null = range.getBoundingClientRect();
+    // A collapsed range on an empty line has no rect — fall back to its element.
+    if (!rect || (rect.top === 0 && rect.height === 0)) {
+        const node = selection.focusNode;
+        const el =
+            node instanceof HTMLElement ? node : (node?.parentElement ?? null);
+        rect = el ? el.getBoundingClientRect() : null;
+    }
+    if (!rect) {
+        return;
+    }
+
+    const toolbar = document.getElementById("block-toolbar");
+    const shell = document.getElementById("editor-shell");
+    const topSafe = (toolbar?.getBoundingClientRect().height ?? 0) + 16;
+    const bottomInset = shell
+        ? parseFloat(getComputedStyle(shell).paddingBottom) || 0
+        : 0;
+    const bottomSafe = window.innerHeight - bottomInset - 16;
+
+    if (rect.bottom > bottomSafe) {
+        appElement.scrollTop += rect.bottom - bottomSafe;
+    } else if (rect.top < topSafe) {
+        appElement.scrollTop -= topSafe - rect.top;
+    }
+}
+
+editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
+    // Only after real edits (typing/inserting) — not on focus or plain caret
+    // moves (e.g. clicking back from the AI bar), which shouldn't yank the scroll.
+    if (loading || (dirtyElements.size === 0 && dirtyLeaves.size === 0)) {
+        return;
+    }
+    // After reconciliation + layout, so the caret rect is up to date.
+    requestAnimationFrame(scrollCaretIntoView);
 });
 
 // --- Host bridge: inbound calls from the host ---

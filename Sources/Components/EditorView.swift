@@ -184,7 +184,7 @@ struct EditorView: NSViewRepresentable {
             evaluate("window.macfolioFind(\(jsEncoded(text)));")
         }
 
-        // Pad the scroll container (#editor-shell keeps its 15px base) so content
+        // Pad the scroll container (#editor-shell keeps its 32px base) so content
         // can scroll above the floating AI bar. Injected rather than baked into
         // the editor CSS so it tracks the bar's live height.
         func applyBottomInset() {
@@ -192,7 +192,7 @@ struct EditorView: NSViewRepresentable {
             let px = max(0, Int(bottomInset.rounded()))
             evaluate(
                 "(function(){var s=document.getElementById('editor-shell');"
-                    + "if(s){s.style.paddingBottom=(15+\(px))+'px';}})();")
+                    + "if(s){s.style.paddingBottom=(32+\(px))+'px';}})();")
         }
 
         func evaluate(_ script: String) {
