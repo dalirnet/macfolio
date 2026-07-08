@@ -10,6 +10,13 @@ struct EditorSelectionContext: Equatable {
     var blockText = ""
 }
 
+/// A request to jump to text in the loaded document — the ⌘F search opens a
+/// result on its match. The `token` makes repeat requests for the same text fire.
+struct EditorFindRequest: Equatable {
+    let token: Int
+    let text: String
+}
+
 /// The editor surface: Lexical (vanilla) WYSIWYG in a WebView. Loads the file's
 /// Markdown and posts edits back so we autosave. `docID` identifies the loaded
 /// file; `editable` is dropped to false while the agent writes. `fileURL` /
@@ -24,6 +31,9 @@ struct EditorView: NSViewRepresentable {
     /// Extra scroll space at the bottom of the content so the last lines clear the
     /// floating AI bar overlaid on top of the editor.
     let bottomInset: CGFloat
+    /// When set (and changed), scroll to + highlight this text once the document
+    /// is loaded. Driven by the ⌘F search opening a result on its match.
+    let findRequest: EditorFindRequest?
     /// The caret's selection/line, reported as it changes (for AI prompt context).
     let onSelection: (EditorSelectionContext) -> Void
     let onSave: (String) -> Void
@@ -87,6 +97,11 @@ struct EditorView: NSViewRepresentable {
             coordinator.bottomInset = bottomInset
             coordinator.applyBottomInset()
         }
+        if let request = findRequest, coordinator.findToken != request.token {
+            coordinator.findToken = request.token
+            coordinator.pendingFind = request.text
+            coordinator.flushFind()
+        }
     }
 
     final class Coordinator: NSObject, WKScriptMessageHandler, WKURLSchemeHandler {
@@ -100,6 +115,9 @@ struct EditorView: NSViewRepresentable {
         var fileURL: URL?
         var projectRoot: URL?
         var bottomInset: CGFloat = 0
+        var findToken = 0
+        /// A find awaiting the document load; flushed once the doc is pushed.
+        var pendingFind: String?
         private var accentObserver: NSObjectProtocol?
         private var appearanceObservation: NSKeyValueObservation?
 
@@ -155,6 +173,15 @@ struct EditorView: NSViewRepresentable {
             guard ready, let doc = pending else { return }
             pending = nil
             evaluate("window.macfolioLoad(\(jsEncoded(doc)));")
+            flushFind()
+        }
+
+        // Run a queued find once the editor is ready and its document is loaded
+        // (so the match text exists to scroll to).
+        func flushFind() {
+            guard ready, pending == nil, let text = pendingFind else { return }
+            pendingFind = nil
+            evaluate("window.macfolioFind(\(jsEncoded(text)));")
         }
 
         // Pad the scroll container (#editor-shell keeps its 15px base) so content

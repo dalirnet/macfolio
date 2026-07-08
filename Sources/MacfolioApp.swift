@@ -50,6 +50,14 @@ import SwiftUI
                     .disabled(setupStep != .ready)
                 }
 
+                CommandGroup(after: .textEditing) {
+                    Button("Find") {
+                        NotificationCenter.default.post(name: .openSearch, object: nil)
+                    }
+                    .keyboardShortcut("f", modifiers: .command)
+                    .disabled(setupStep != .ready)
+                }
+
                 CommandGroup(replacing: .appInfo) {
                     Button("About Macfolio") {
                         NSApp.activate(ignoringOtherApps: true)
@@ -78,6 +86,7 @@ import SwiftUI
 
     extension Notification.Name {
         static let newProject = Notification.Name("newProject")
+        static let openSearch = Notification.Name("openSearch")
     }
 
 #endif

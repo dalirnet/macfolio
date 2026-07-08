@@ -54,6 +54,7 @@ import {
     $applyNodeReplacement,
     $createNodeSelection,
     $createParagraphNode,
+    $createRangeSelection,
     $getNearestNodeFromDOMNode,
     $getRoot,
     $getSelection,
@@ -116,6 +117,7 @@ declare global {
         macfolioSetLink: (url: string) => void;
         macfolioSetImage: (src: string, alt: string) => void;
         macfolioInsertCodeBlock: (language: string) => void;
+        macfolioFind: (query: string) => void;
         webkit?: {
             messageHandlers: Record<
                 string,
@@ -1693,6 +1695,39 @@ window.macfolioInsertCodeBlock = (language) => {
         }
     });
     savedSelection = null;
+};
+
+// Jump to the first occurrence of `query` (case-insensitive): select it and
+// scroll its block into view. Used by the host's ⌘F search to open a result on
+// its match. No-op when the text isn't in the body (e.g. a title-only match).
+window.macfolioFind = (query) => {
+    const needle = (query ?? "").trim().toLowerCase();
+    if (!needle) {
+        return;
+    }
+    let blockKey: string | null = null;
+    editor.update(() => {
+        for (const node of $getRoot().getAllTextNodes()) {
+            const index = node.getTextContent().toLowerCase().indexOf(needle);
+            if (index === -1) {
+                continue;
+            }
+            const selection = $createRangeSelection();
+            selection.anchor.set(node.getKey(), index, "text");
+            selection.focus.set(node.getKey(), index + needle.length, "text");
+            $setSelection(selection);
+            blockKey = node.getTopLevelElement()?.getKey() ?? node.getKey();
+            break;
+        }
+    });
+    if (!blockKey) {
+        return;
+    }
+    // Reveal it: focus so the selection renders, then centre its element.
+    editor.focus();
+    editor
+        .getElementByKey(blockKey)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
 };
 
 // --- Start ---

@@ -30,6 +30,11 @@ struct MainView: View {
     @State private var renameTitle = ""
     @State private var renameProjectTarget: Project?
     @State private var renameProjectTitle = ""
+    /// The ⌘F search palette.
+    @State private var showSearch = false
+    /// The pending "jump to match" for the editor, set when opening a search
+    /// result. Each request bumps the token so repeats (same file + query) fire.
+    @State private var findRequest: EditorFindRequest?
 
     var body: some View {
         NavigationSplitView {
@@ -58,6 +63,16 @@ struct MainView: View {
         .alert("New Document", isPresented: $showAddFile) { newFilePrompt }
         .alert("Rename Document", isPresented: renameBinding) { renamePrompt }
         .alert("Rename Project", isPresented: renameProjectBinding) { renameProjectPrompt }
+        .overlay {
+            if showSearch {
+                SearchOverlay(
+                    onOpen: openSearchResult,
+                    onClose: { showSearch = false }
+                )
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.12), value: showSearch)
         .onAppear {
             chat.activate(projects.project)
             expandOpenProject()
@@ -73,6 +88,18 @@ struct MainView: View {
         .onReceive(NotificationCenter.default.publisher(for: .newProject)) { _ in
             startNewProject()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openSearch)) { _ in
+            showSearch = true
+        }
+    }
+
+    /// Open a search result: switch to its project (if needed), select the file
+    /// and expand it in the sidebar, then ask the editor to jump to the match.
+    private func openSearchResult(_ project: Project, _ file: ProjectFile, _ query: String) {
+        if projects.project?.id != project.id { projects.select(project) }
+        projects.selected = file
+        expandedProjects.insert(project.id)
+        findRequest = EditorFindRequest(token: (findRequest?.token ?? 0) + 1, text: query)
     }
 
     // MARK: - Text prompts (New / Rename)
@@ -286,6 +313,7 @@ struct MainView: View {
                 fileURL: file.url,
                 projectRoot: projects.project?.root,
                 bottomInset: promptOpen ? promptBarHeight : 0,
+                findRequest: findRequest,
                 onSelection: { selection = $0 },
                 onSave: { text in projects.save(text, to: file) }
             )
