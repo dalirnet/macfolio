@@ -3,14 +3,15 @@ import Foundation
 /// A chapter's YAML frontmatter — the metadata block at the top of a `.md` file,
 /// fenced by `---`. Modeled on **Jekyll**'s front matter so files drop straight
 /// into a Jekyll site. Only the fields an author actually sets are surfaced —
-/// `title`, `order`, `date`, and `tags`. Any other keys a file carries (`categories`,
-/// `published`, `layout`, custom params, …) are preserved verbatim in `extra`, so
-/// editing metadata never drops a field we don't manage.
+/// `title`, `order`, `date`, `draft`, and `tags`. Any other keys a file carries
+/// (`categories`, `published`, `layout`, custom params, …) are preserved verbatim
+/// in `extra`, so editing metadata never drops a field we don't manage.
 ///
 ///     ---
 ///     title: The Opening
 ///     order: 1
 ///     date: 2026-07-09
+///     draft: true
 ///     tags: [intro, backstory]
 ///     ---
 ///
@@ -22,6 +23,9 @@ struct Frontmatter: Equatable, Hashable {
     /// Chapters with an `order` sort ahead of the rest, ascending.
     var order: Int?
     var date: String = ""
+    /// Whether the chapter is a work in progress (a custom flag; only written when
+    /// `true`, so published files stay clean). Kept out of the sidebar's live view.
+    var draft: Bool = false
     var tags: [String] = []
     /// Other frontmatter lines, preserved verbatim (Jekyll fields we don't surface,
     /// plus any custom keys), so a full Jekyll file round-trips losslessly.
@@ -30,7 +34,7 @@ struct Frontmatter: Equatable, Hashable {
     /// Whether any field carries a value worth writing (an all-default block is
     /// omitted, keeping plain files plain).
     var isEmpty: Bool {
-        title.isEmpty && order == nil && date.isEmpty && tags.isEmpty && extra.isEmpty
+        title.isEmpty && order == nil && date.isEmpty && !draft && tags.isEmpty && extra.isEmpty
     }
 
     /// Today's date in the stored `yyyy-MM-dd` form, for seeding new files.
@@ -43,7 +47,7 @@ struct Frontmatter: Equatable, Hashable {
 
     // MARK: - Parsing
 
-    private static let managedKeys: Set<String> = ["title", "order", "date", "tags"]
+    private static let managedKeys: Set<String> = ["title", "order", "date", "draft", "tags"]
 
     /// Split a raw file into its frontmatter (if present) and the body that
     /// follows. A file with no leading `---` block yields `(Frontmatter(), raw)`.
@@ -104,6 +108,7 @@ struct Frontmatter: Equatable, Hashable {
             case "title": meta.title = value
             case "order": meta.order = Int(value)
             case "date": meta.date = value
+            case "draft": meta.draft = (value.lowercased() == "true")
             case "tags":
                 let (items, next) = array(after: i, inlineValue: value, in: lines)
                 meta.tags = items
@@ -177,6 +182,7 @@ struct Frontmatter: Equatable, Hashable {
         if !title.isEmpty { lines.append("title: \(Self.quoteIfNeeded(title))") }
         if let order { lines.append("order: \(order)") }
         if !date.isEmpty { lines.append("date: \(date)") }
+        if draft { lines.append("draft: true") }
         if !tags.isEmpty { lines.append("tags: [\(tags.joined(separator: ", "))]") }
         lines.append(contentsOf: extra)
         lines.append("---")

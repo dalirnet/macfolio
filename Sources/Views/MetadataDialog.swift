@@ -11,6 +11,8 @@ enum MetadataDialog {
         let titleField = DialogField.textField(meta.title)
         let orderField = DialogField.numberField(meta.order)
         let dateField = DialogField.textField(meta.date)
+        let statusPopup = DialogField.popup(["Published", "Draft"])
+        statusPopup.selectItem(at: meta.draft ? 1 : 0)
         let tagsField = DialogField.textField(meta.tags.joined(separator: ", "))
 
         let alert = NSAlert()
@@ -20,6 +22,7 @@ enum MetadataDialog {
             DialogField.labeled("Title", titleField),
             DialogField.labeled("Order", orderField, hint: "sidebar position"),
             DialogField.labeled("Date", dateField, hint: "YYYY-MM-DD"),
+            DialogField.labeled("Status", statusPopup),
             DialogField.labeled("Tags", tagsField, hint: "comma-separated"),
         ])
         alert.addButton(withTitle: "Save")
@@ -31,6 +34,7 @@ enum MetadataDialog {
             meta.title = titleField.stringValue.trimmingCharacters(in: .whitespaces)
             meta.order = Int(orderField.stringValue.trimmingCharacters(in: .whitespaces))
             meta.date = dateField.stringValue.trimmingCharacters(in: .whitespaces)
+            meta.draft = statusPopup.indexOfSelectedItem == 1
             meta.tags = commaList(tagsField.stringValue)
             ProjectStore.shared.updateMetadata(meta, for: file)
         }

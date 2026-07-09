@@ -2,7 +2,7 @@
     import SwiftUI
 
     /// The chapter metadata sheet — the iOS counterpart of `MetadataDialog`. Edits
-    /// the core fields (title, order, date, tags) and writes them back through
+    /// the core fields (title, order, date, draft, tags) and writes them back through
     /// `ProjectStore` on Save. Fields it doesn't surface are preserved. Opened from
     /// the sidebar's menu.
     struct TouchMetadataView: View {
@@ -33,6 +33,10 @@
                         TextField("Order", text: $orderText)
                             .keyboardType(.numberPad)
                         TextField("Date (YYYY-MM-DD)", text: $meta.date)
+                        Picker("Status", selection: $meta.draft) {
+                            Text("Published").tag(false)
+                            Text("Draft").tag(true)
+                        }
                     }
                     Section("Tags") {
                         TextField("comma-separated", text: $tagsText)
