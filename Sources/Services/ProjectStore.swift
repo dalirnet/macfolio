@@ -79,8 +79,8 @@ final class ProjectStore: ObservableObject {
         }
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         refreshProjects()
-        // A project always has at least one file — seed the first and open it.
-        addFile(title: "Untitled", to: Project(root: root, title: root.lastPathComponent))
+        // Open the (empty) project; the user adds documents when they want them.
+        openProject(Project(root: root, title: root.lastPathComponent))
     }
 
     func select(_ project: Project) { openProject(project) }
@@ -222,7 +222,8 @@ final class ProjectStore: ObservableObject {
 
     // MARK: - File operations
 
-    /// Add a file to a project (or the open project), seeded with a title heading.
+    /// Add a file to a project (or the open project), seeded with frontmatter —
+    /// the title, today's date, and the next order (one past the highest existing).
     func addFile(title: String, to targetProject: Project? = nil) {
         guard let target = targetProject ?? project else { return }
         var url = target.root.appendingPathComponent("\(slugify(title)).md")
@@ -231,8 +232,10 @@ final class ProjectStore: ObservableObject {
             url = target.root.appendingPathComponent("\(slugify(title))-\(n).md")
             n += 1
         }
+        let existing = filesByProject[target.id] ?? loadFiles(target)
         var meta = Frontmatter()
         meta.title = title
+        meta.order = (existing.compactMap { $0.metadata.order }.max() ?? 0) + 1
         meta.date = Frontmatter.today()
         try? Frontmatter.join(meta, body: "# \(title)\n\n")
             .write(to: url, atomically: true, encoding: .utf8)
@@ -258,25 +261,30 @@ final class ProjectStore: ObservableObject {
         }
     }
 
-    /// Rename a file.
+    /// Rename a file: set its frontmatter `title` (what the sidebar shows) and, when
+    /// possible, rename the file on disk to match. Both matter because `displayTitle`
+    /// prefers the frontmatter title over the filename.
     func rename(_ file: ProjectFile, to title: String) {
-        let newURL = file.url.deletingLastPathComponent()
-            .appendingPathComponent("\(slugify(title)).md")
-        guard newURL != file.url, !FileManager.default.fileExists(atPath: newURL.path) else {
-            return
+        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+
+        var meta = metadata(of: file)
+        meta.title = clean
+        try? Frontmatter.join(meta, body: body(of: file))
+            .write(to: file.url, atomically: true, encoding: .utf8)
+
+        var target = file.url
+        let newURL = file.url.deletingLastPathComponent().appendingPathComponent("\(slugify(clean)).md")
+        if newURL != file.url, !FileManager.default.fileExists(atPath: newURL.path) {
+            try? FileManager.default.moveItem(at: file.url, to: newURL)
+            target = newURL
         }
-        try? FileManager.default.moveItem(at: file.url, to: newURL)
-        reload(after: file, select: newURL)
+        reload(after: file, select: target)
     }
 
-    /// Delete a file, but keep at least one file in the project.
+    /// Delete a file. A project may end up with no documents (the empty state
+    /// prompts the user to add one).
     func delete(_ file: ProjectFile) {
-        let dir = file.url.deletingLastPathComponent()
-        let mdCount =
-            ((try? FileManager.default.contentsOfDirectory(
-                at: dir, includingPropertiesForKeys: nil)) ?? [])
-            .filter { $0.pathExtension == "md" }.count
-        guard mdCount > 1 else { return }  // a project always keeps ≥ 1 file
         try? FileManager.default.removeItem(at: file.url)
         reload(after: file, select: nil)
     }
