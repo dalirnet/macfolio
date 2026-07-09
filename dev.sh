@@ -29,6 +29,12 @@ build_arch() {
         Sources/Utils/*.swift \
         -framework SwiftUI -framework AppKit -framework WebKit \
         -target ${3}-apple-macos13.0
+    # swiftc writes per-file intermediates (.d/.dia/.swiftdeps/.swiftmodule) into
+    # the working dir; drop them so they never litter the repo root. `find` avoids
+    # unmatched-glob surprises across shells.
+    find . -maxdepth 1 -type f \
+        \( -name '*.d' -o -name '*.dia' -o -name '*.swiftdeps' -o -name '*.swiftmodule' \
+        -o -name '*.swiftdoc' \) -delete
 }
 
 # Build the embedded Lexical editor bundle (Vite → build/editor). Installs npm

@@ -18,6 +18,10 @@ Package.resolved
 *.o
 *.swiftmodule
 *.swiftdoc
+# swiftc intermediates the release build can leak into the repo root
+*.d
+*.dia
+*.swiftdeps
 
 # Editor web bundle (build output goes to build/, covered above)
 Resources/Editor/node_modules/
