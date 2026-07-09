@@ -62,23 +62,9 @@ final class ClaudeService: AgentService {
     /// Locate the `claude` binary, caching it in `executablePath`.
     @discardableResult
     func locate() -> String? {
-        let fileManager = FileManager.default
-
-        for path in Self.candidatePaths where fileManager.isExecutableFile(atPath: path) {
-            executablePath = path
-            return path
-        }
-
-        // Fall back to the login shell's PATH (nvm, custom prefixes, etc.).
-        let resolved = Shell.output("/bin/zsh", ["-lic", "command -v claude"])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if !resolved.isEmpty, fileManager.isExecutableFile(atPath: resolved) {
-            executablePath = resolved
-            return resolved
-        }
-
-        executablePath = nil
-        return nil
+        if let executablePath { return executablePath }
+        executablePath = Shell.locate("claude", candidates: Self.candidatePaths)
+        return executablePath
     }
 
     /// True when the CLI is installed and runnable (`claude --version`).

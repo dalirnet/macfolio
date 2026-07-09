@@ -3,10 +3,11 @@ import Foundation
 /// Thin wrapper over `Process` — run a binary, optionally capture stdout.
 enum Shell {
     @discardableResult
-    static func run(_ executable: String, _ args: [String]) -> Bool {
+    static func run(_ executable: String, _ args: [String], cwd: URL? = nil) -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = args
+        if let cwd { process.currentDirectoryURL = cwd }
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         do {
@@ -34,6 +35,19 @@ enum Shell {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    /// Locate an executable: try known absolute paths first (a launched `.app`
+    /// doesn't inherit the shell PATH), then fall back to the login shell's PATH
+    /// (nvm, custom prefixes, …). Returns nil if it's nowhere runnable.
+    static func locate(_ command: String, candidates: [String]) -> String? {
+        let fileManager = FileManager.default
+        for path in candidates where fileManager.isExecutableFile(atPath: path) {
+            return path
+        }
+        let resolved = output("/bin/zsh", ["-lic", "command -v \(command)"])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return !resolved.isEmpty && fileManager.isExecutableFile(atPath: resolved) ? resolved : nil
     }
 
     /// Run a process and deliver stdout **line by line** as it arrives (for
