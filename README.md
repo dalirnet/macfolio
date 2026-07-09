@@ -54,10 +54,16 @@ Right-to-left first — Persian and English mix freely, per paragraph:
 
 ### Organize
 
-- **Books › chapters sidebar.** A clean tree of every book and its chapters. Right-click a chapter to
-  copy its Markdown, rename, or delete it; add new chapters per book.
+- **Books › chapters sidebar.** A clean tree of every book and its chapters, kept in reading order.
+  Right-click a chapter to edit its metadata, rename, or delete it; add new chapters per book.
+- **Chapter metadata.** Each chapter carries **Jekyll-style front matter** — `title`, `order`, `date`,
+  `tags` — edited in a small form and kept at the top of the `.md` file (hidden from the editor). The
+  sidebar sorts by `order`, and any extra front-matter keys you add are preserved untouched.
 - **Media at a glance.** Images inside a book (e.g. an `images/` folder) are listed alongside its
   chapters.
+- **Snapshots & history** _(macOS)_. Version each book with one click — Macfolio keeps a per-project
+  git repo, so you can browse the timeline, **restore** an earlier snapshot (non-destructively), or
+  remove one. Handy for undoing a round of the co-author's edits.
 
 ### Fits right in
 
