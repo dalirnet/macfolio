@@ -19,6 +19,9 @@
         @State private var aiAvailable: Bool?
         @State private var showSettings = false
         @State private var metadataTarget: ProjectFile?
+        /// Pending deletions, awaiting confirmation.
+        @State private var deleteFileTarget: ProjectFile?
+        @State private var deleteProjectTarget: Project?
         /// Bumped after the agent edits files, to reload the editor from disk.
         @State private var editorReload = 0
 
@@ -72,10 +75,28 @@
             .navigationSplitViewStyle(.balanced)
             .alert("New Project", isPresented: $showNewProject) { newProjectPrompt }
             .alert("New Document", isPresented: $showAddFile) { newFilePrompt }
-            .alert("Rename Document", isPresented: renameBinding) { renamePrompt }
-            .alert("Rename Project", isPresented: renameProjectBinding) { renameProjectPrompt }
+            .alert("Rename Document", isPresented: $renameTarget.isPresent()) { renamePrompt }
+            .alert("Rename Project", isPresented: $renameProjectTarget.isPresent()) { renameProjectPrompt }
             .sheet(isPresented: $showSettings) { TouchSettingsView() }
             .sheet(item: $metadataTarget) { TouchMetadataView(file: $0) }
+            .confirmationDialog(
+                "Delete this document?",
+                isPresented: $deleteFileTarget.isPresent(), presenting: deleteFileTarget
+            ) { file in
+                Button("Delete", role: .destructive) { projects.delete(file) }
+                Button("Cancel", role: .cancel) {}
+            } message: { file in
+                Text("“\(file.displayTitle)” will be deleted.")
+            }
+            .confirmationDialog(
+                "Delete this project?",
+                isPresented: $deleteProjectTarget.isPresent(), presenting: deleteProjectTarget
+            ) { project in
+                Button("Delete", role: .destructive) { projects.deleteProject(project) }
+                Button("Cancel", role: .cancel) {}
+            } message: { project in
+                Text("“\(project.title)” and all its documents will be deleted.")
+            }
             .onAppear {
                 chat.activate(projects.project)
                 expandOpenProject()
@@ -236,12 +257,11 @@
             if let file = node.file {
                 Button("Metadata") { metadataTarget = file }
                 Button("Rename") {
-                    renameTitle = file.title
+                    renameTitle = file.displayTitle
                     renameTarget = file
                 }
                 Divider()
-                Button("Delete", role: .destructive) { projects.delete(file) }
-                    .disabled((projects.filesByProject[node.project.id]?.count ?? 0) <= 1)
+                Button("Delete", role: .destructive) { deleteFileTarget = file }
             } else {
                 Button("New Document") { startAddFile(node.project) }
                 Button("Rename") {
@@ -250,7 +270,7 @@
                 }
                 Divider()
                 Button("Delete Project", role: .destructive) {
-                    projects.deleteProject(node.project)
+                    deleteProjectTarget = node.project
                 }
             }
         }
@@ -344,16 +364,6 @@
         private func startNewSession() {
             guard let project = projects.project else { return }
             chat.newSession(in: project)
-        }
-
-        private var renameBinding: Binding<Bool> {
-            Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })
-        }
-
-        private var renameProjectBinding: Binding<Bool> {
-            Binding(
-                get: { renameProjectTarget != nil },
-                set: { if !$0 { renameProjectTarget = nil } })
         }
     }
 #endif

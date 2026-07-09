@@ -36,6 +36,9 @@
 		AF0000000000000000000065 /* Frontmatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Frontmatter.swift; path = Sources/Models/Frontmatter.swift; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000066 /* MetadataDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MetadataDialog.swift; path = Sources/Views/MetadataDialog.swift; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000067 /* TouchMetadataView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TouchMetadataView.swift; path = Sources/Touch/TouchMetadataView.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000068 /* GitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GitService.swift; path = Sources/Services/GitService.swift; sourceTree = SOURCE_ROOT; };
+		AF0000000000000000000069 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HistoryView.swift; path = Sources/Views/HistoryView.swift; sourceTree = SOURCE_ROOT; };
+		AF000000000000000000006A /* Binding+Optional.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Binding+Optional.swift"; path = "Sources/Utils/Binding+Optional.swift"; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000018 /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fonts; path = Resources/Fonts; sourceTree = SOURCE_ROOT; };
 		AF0000000000000000000019 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; name = AppIcon.icns; path = Resources/AppIcon.icns; sourceTree = SOURCE_ROOT; };
 		AF000000000000000000001A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = Resources/Info.plist; sourceTree = SOURCE_ROOT; };
@@ -85,6 +88,10 @@
 		AF0000000000000000000074 /* MetadataDialog.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000066 /* MetadataDialog.swift */; };
 		AF0000000000000000000087 /* Frontmatter.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000065 /* Frontmatter.swift */; };
 		AF0000000000000000000088 /* TouchMetadataView.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000067 /* TouchMetadataView.swift */; };
+		AF0000000000000000000075 /* GitService.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000068 /* GitService.swift */; };
+		AF0000000000000000000076 /* HistoryView.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000069 /* HistoryView.swift */; };
+		AF0000000000000000000077 /* Binding+Optional.swift in Sources (mac) */ = {isa = PBXBuildFile; fileRef = AF000000000000000000006A /* Binding+Optional.swift */; };
+		AF0000000000000000000089 /* Binding+Optional.swift in Sources (ios) */ = {isa = PBXBuildFile; fileRef = AF000000000000000000006A /* Binding+Optional.swift */; };
 		AF000000000000000000003C /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000018 /* Fonts */; };
 		AF000000000000000000003D /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000019 /* AppIcon.icns */; };
 		AF000000000000000000003E /* Fonts in Resources (ios) */ = {isa = PBXBuildFile; fileRef = AF0000000000000000000018 /* Fonts */; };
@@ -122,6 +129,9 @@
 				AF0000000000000000000065 /* Frontmatter.swift */,
 				AF0000000000000000000066 /* MetadataDialog.swift */,
 				AF0000000000000000000067 /* TouchMetadataView.swift */,
+				AF0000000000000000000068 /* GitService.swift */,
+				AF0000000000000000000069 /* HistoryView.swift */,
+				AF000000000000000000006A /* Binding+Optional.swift */,
 			);
 			name = Sources;
 			sourceTree = "<group>";
@@ -184,6 +194,9 @@
 				AF0000000000000000000072,
 				AF0000000000000000000073,
 				AF0000000000000000000074,
+				AF0000000000000000000075,
+				AF0000000000000000000076,
+				AF0000000000000000000077,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -217,6 +230,7 @@
 				AF000000000000000000002B,
 				AF000000000000000000003A,
 				AF000000000000000000003B,
+				AF0000000000000000000089,
 				AF0000000000000000000080,
 				AF0000000000000000000081,
 				AF0000000000000000000082,

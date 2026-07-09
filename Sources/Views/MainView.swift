@@ -39,6 +39,11 @@ struct MainView: View {
     /// Whether the Claude Code CLI is installed and runnable. Gates the AI bar;
     /// checked once on appear (nil = not yet determined).
     @State private var aiAvailable: Bool?
+    /// The project whose snapshot history is shown (nil = closed).
+    @State private var historyProject: Project?
+    /// Pending deletions, awaiting confirmation.
+    @State private var deleteFileTarget: ProjectFile?
+    @State private var deleteProjectTarget: Project?
 
     var body: some View {
         NavigationSplitView {
@@ -52,8 +57,35 @@ struct MainView: View {
         .toolbar { toolbar }
         .alert("New Project", isPresented: $showNewProject) { newProjectPrompt }
         .alert("New Document", isPresented: $showAddFile) { newFilePrompt }
-        .alert("Rename Document", isPresented: renameBinding) { renamePrompt }
-        .alert("Rename Project", isPresented: renameProjectBinding) { renameProjectPrompt }
+        .alert("Rename Document", isPresented: $renameTarget.isPresent()) { renamePrompt }
+        .alert("Rename Project", isPresented: $renameProjectTarget.isPresent()) { renameProjectPrompt }
+        .sheet(item: $historyProject) { project in
+            HistoryView(
+                project: project,
+                onRestore: {
+                    projects.refresh()
+                    editorReload += 1
+                },
+                onClose: { historyProject = nil })
+        }
+        .confirmationDialog(
+            "Delete this document?",
+            isPresented: $deleteFileTarget.isPresent(), presenting: deleteFileTarget
+        ) { file in
+            Button("Delete", role: .destructive) { projects.delete(file) }
+            Button("Cancel", role: .cancel) {}
+        } message: { file in
+            Text("“\(file.displayTitle)” will be deleted.")
+        }
+        .confirmationDialog(
+            "Delete this project?",
+            isPresented: $deleteProjectTarget.isPresent(), presenting: deleteProjectTarget
+        ) { project in
+            Button("Delete", role: .destructive) { projects.deleteProject(project) }
+            Button("Cancel", role: .cancel) {}
+        } message: { project in
+            Text("“\(project.title)” and all its documents will be deleted.")
+        }
         .overlay {
             if showSearch {
                 SearchOverlay(
@@ -289,12 +321,11 @@ struct MainView: View {
         if let file = node.file {
             Button("Metadata") { MetadataDialog.present(file) }
             Button("Rename") {
-                renameTitle = file.title
+                renameTitle = file.displayTitle
                 renameTarget = file
             }
             Divider()
-            Button("Delete", role: .destructive) { projects.delete(file) }
-                .disabled((projects.filesByProject[node.project.id]?.count ?? 0) <= 1)
+            Button("Delete", role: .destructive) { deleteFileTarget = file }
         } else {
             Button("New Document") { startAddFile(node.project) }
             Button("Rename") {
@@ -305,7 +336,10 @@ struct MainView: View {
                 NSWorkspace.shared.activateFileViewerSelecting([node.project.root])
             }
             Divider()
-            Button("Delete Project", role: .destructive) { projects.deleteProject(node.project) }
+            Button("Snapshot") { snapshot(node.project) }
+            Button("History") { historyProject = node.project }
+            Divider()
+            Button("Delete Project", role: .destructive) { deleteProjectTarget = node.project }
         }
     }
 
@@ -370,15 +404,6 @@ struct MainView: View {
         showAddFile = true
     }
 
-    private var renameBinding: Binding<Bool> {
-        Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })
-    }
-
-    private var renameProjectBinding: Binding<Bool> {
-        Binding(
-            get: { renameProjectTarget != nil },
-            set: { if !$0 { renameProjectTarget = nil } })
-    }
 
     private func startNewSession() {
         guard let project = projects.project else { return }
@@ -396,6 +421,10 @@ struct MainView: View {
             projects.refresh()
             editorReload += 1
         }
+    }
+
+    private func snapshot(_ project: Project) {
+        Task.detached { GitService.shared.snapshot(project, message: "Snapshot") }
     }
 
     /// Stop the open project's in-flight agent turn.
