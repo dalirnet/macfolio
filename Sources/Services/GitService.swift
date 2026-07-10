@@ -73,22 +73,56 @@ final class GitService {
         }
     }
 
-    /// Drop a snapshot from history, replaying the ones after it onto its parent.
-    /// Each snapshot is a full-tree state, so `-X theirs` resolves any overlap by
-    /// keeping the later snapshot's content — the end state is preserved. The very
-    /// first commit has no parent and can't be removed this way.
+    /// Drop a snapshot from history while preserving every other snapshot's exact
+    /// state. Each snapshot is a full-tree state, so we can't replay the later ones
+    /// as diffs (a diff-based rebase would silently lose files a dropped snapshot
+    /// introduced but its successors never touched). Instead we re-commit each later
+    /// snapshot with its *original tree*, reparented onto the dropped commit's parent
+    /// — the trees are byte-for-byte identical, so no content is ever lost or merged.
+    /// The very first commit has no parent and can't be removed this way.
     @discardableResult
     func removeSnapshot(_ project: Project, _ commit: GitCommit) -> Bool {
         guard let git = locate(), isRepo(project) else { return false }
         ensureIdentity(git, project)
-        guard run(git, ["rev-parse", "--verify", "--quiet", "\(commit.hash)^"], project) else {
-            return false
+        let parent = Shell.output(
+            git, ["rev-parse", "--verify", "\(commit.hash)^"], cwd: project.root
+        )
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !parent.isEmpty else { return false }  // first commit — nothing to reparent onto
+
+        // Later snapshots, oldest first. Empty when removing the newest snapshot,
+        // in which case we simply move HEAD back to the dropped commit's parent.
+        let later = Shell.output(
+            git, ["rev-list", "--reverse", "\(commit.hash)..HEAD"], cwd: project.root
+        )
+        .split(separator: "\n").map(String.init)
+
+        var newParent = parent
+        for old in later {
+            let tree = Shell.output(git, ["rev-parse", "\(old)^{tree}"], cwd: project.root)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let message = Shell.output(git, ["log", "-1", "--format=%B", old], cwd: project.root)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            // Preserve the original author/committer timestamps so history keeps its dates.
+            let env = [
+                "GIT_AUTHOR_DATE": commitDate(git, project, old, "%aI"),
+                "GIT_COMMITTER_DATE": commitDate(git, project, old, "%cI"),
+            ]
+            let created = Shell.output(
+                git, ["commit-tree", tree, "-p", newParent, "-m", message],
+                cwd: project.root, env: env
+            ).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !created.isEmpty else { return false }
+            newParent = created
         }
-        let ok = run(
-            git, ["rebase", "--autostash", "-X", "theirs", "--onto", "\(commit.hash)^", commit.hash],
-            project)
-        if !ok { run(git, ["rebase", "--abort"], project) }
-        return ok
+        return run(git, ["reset", "--hard", newParent], project)
+    }
+
+    private func commitDate(_ git: String, _ project: Project, _ ref: String, _ format: String)
+        -> String
+    {
+        Shell.output(git, ["log", "-1", "--format=\(format)", ref], cwd: project.root)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// The current commit's hash (HEAD), or nil when there are no commits.
@@ -101,11 +135,16 @@ final class GitService {
 
     /// Restore the working tree to a past commit's contents, recording the result
     /// as a new commit — non-destructive, so the history is never rewritten.
+    ///
+    /// `read-tree --reset` makes the index *and* working tree match the target tree
+    /// exactly, which crucially also **deletes files added after the snapshot** —
+    /// `checkout <hash> -- .` would leave those stragglers behind, so the restore
+    /// wouldn't actually match the snapshot.
     @discardableResult
     func restore(_ project: Project, to commit: GitCommit) -> Bool {
         guard let git = locate(), isRepo(project) else { return false }
         ensureIdentity(git, project)
-        run(git, ["checkout", commit.hash, "--", "."], project)
+        guard run(git, ["read-tree", "-u", "--reset", commit.hash], project) else { return false }
         guard isDirty(git, project) else { return true }  // already at that state
         run(git, ["add", "-A"], project)
         return run(git, ["commit", "-m", "Restore to \(commit.shortHash)"], project)

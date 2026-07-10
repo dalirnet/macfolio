@@ -19,11 +19,16 @@ enum Shell {
         return process.terminationStatus == 0
     }
 
-    static func output(_ executable: String, _ args: [String], cwd: URL? = nil) -> String {
+    static func output(
+        _ executable: String, _ args: [String], cwd: URL? = nil, env: [String: String]? = nil
+    ) -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = args
         if let cwd { process.currentDirectoryURL = cwd }
+        if let env {
+            process.environment = ProcessInfo.processInfo.environment.merging(env) { _, new in new }
+        }
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
