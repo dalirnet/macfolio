@@ -76,7 +76,9 @@
             .alert("New Project", isPresented: $showNewProject) { newProjectPrompt }
             .alert("New Document", isPresented: $showAddFile) { newFilePrompt }
             .alert("Rename Document", isPresented: $renameTarget.isPresent()) { renamePrompt }
-            .alert("Rename Project", isPresented: $renameProjectTarget.isPresent()) { renameProjectPrompt }
+            .alert("Rename Project", isPresented: $renameProjectTarget.isPresent()) {
+                renameProjectPrompt
+            }
             .sheet(isPresented: $showSettings) { TouchSettingsView() }
             .sheet(item: $metadataTarget) { TouchMetadataView(file: $0) }
             .confirmationDialog(

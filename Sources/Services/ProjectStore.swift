@@ -274,7 +274,8 @@ final class ProjectStore: ObservableObject {
             .write(to: file.url, atomically: true, encoding: .utf8)
 
         var target = file.url
-        let newURL = file.url.deletingLastPathComponent().appendingPathComponent("\(slugify(clean)).md")
+        let newURL = file.url.deletingLastPathComponent().appendingPathComponent(
+            "\(slugify(clean)).md")
         if newURL != file.url, !FileManager.default.fileExists(atPath: newURL.path) {
             try? FileManager.default.moveItem(at: file.url, to: newURL)
             target = newURL

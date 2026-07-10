@@ -58,7 +58,9 @@ struct MainView: View {
         .alert("New Project", isPresented: $showNewProject) { newProjectPrompt }
         .alert("New Document", isPresented: $showAddFile) { newFilePrompt }
         .alert("Rename Document", isPresented: $renameTarget.isPresent()) { renamePrompt }
-        .alert("Rename Project", isPresented: $renameProjectTarget.isPresent()) { renameProjectPrompt }
+        .alert("Rename Project", isPresented: $renameProjectTarget.isPresent()) {
+            renameProjectPrompt
+        }
         .sheet(item: $historyProject) { project in
             HistoryView(
                 project: project,
@@ -403,7 +405,6 @@ struct MainView: View {
         addFileTitle = ""
         showAddFile = true
     }
-
 
     private func startNewSession() {
         guard let project = projects.project else { return }
