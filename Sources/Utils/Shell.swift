@@ -71,10 +71,16 @@ enum Shell {
     /// `onStart` receives the running `Process` so the caller can `terminate()`
     /// it (e.g. to cancel). If `timeout` elapses before the process exits, it is
     /// terminated — a hung turn can't block the reader forever.
+    ///
+    /// `onError` receives everything the process wrote to stderr, once it exits —
+    /// so a run that fails before producing any stdout can still say why. It's
+    /// drained on its own queue: a full stderr pipe would otherwise block the
+    /// child before it ever closes stdout.
     static func stream(
         _ executable: String, _ args: [String], cwd: URL? = nil,
         timeout: TimeInterval? = nil,
         onStart: ((Process) -> Void)? = nil,
+        onError: ((String) -> Void)? = nil,
         onLine: (String) -> Void
     ) {
         let process = Process()
@@ -83,15 +89,28 @@ enum Shell {
         process.environment = environment()
         if let cwd { process.currentDirectoryURL = cwd }
         let pipe = Pipe()
+        let errorPipe = Pipe()
         process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
+        process.standardError = onError == nil ? FileHandle.nullDevice : errorPipe
         let handle = pipe.fileHandleForReading
         do {
             try process.run()
         } catch {
+            onError?("Could not run \(executable): \(error.localizedDescription)")
             return
         }
         onStart?(process)
+
+        var errorText = ""
+        let errors = DispatchGroup()
+        if onError != nil {
+            errors.enter()
+            DispatchQueue.global().async {
+                let data = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                errorText = String(data: data, encoding: .utf8) ?? ""
+                errors.leave()
+            }
+        }
 
         // Watchdog: terminate the process if it outlives `timeout`. Terminating
         // closes the pipe, so the read loop below drains and exits.
@@ -114,5 +133,7 @@ enum Shell {
         watchdog?.cancel()
         process.waitUntilExit()
         if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) { onLine(line) }
+        errors.wait()
+        onError?(errorText)
     }
 }

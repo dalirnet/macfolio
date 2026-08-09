@@ -89,37 +89,32 @@ final class ClaudeService: AgentService {
     func run(_ instruction: String, in project: Project) -> AsyncStream<TurnEvent> {
         AsyncStream { continuation in
             guard let path = executablePath ?? locate() else {
-                continuation.yield(.finished(reply: nil, usage: nil))
+                continuation.yield(
+                    .finished(reply: "The Claude Code CLI wasn't found.", usage: nil))
                 continuation.finish()
                 return
             }
-            let args = arguments(for: instruction, in: project)
             let box = ProcessBox()
 
             let worker = Task.detached {
-                var result: String?
-                var usage: AgentUsage?
-                // Accumulates the last streamed text block, used as the reply when
-                // the process is cut short (timeout/cancel) before a `result`.
-                var streamed = ""
-                Shell.stream(
-                    path, args, cwd: project.root, timeout: Self.turnTimeout,
-                    onStart: { box.set($0) }
-                ) { line in
-                    self.handle(
-                        line, project: project,
-                        emit: { event in
-                            switch event {
-                            case .replyReset: streamed = ""
-                            case .replyDelta(let text): streamed += text
-                            default: break
-                            }
-                            continuation.yield(event)
-                        },
-                        setResult: { result = $0 }, setUsage: { usage = $0 })
+                let resumed = SessionStore.shared.session(for: project)
+                var turn = self.attempt(
+                    path, instruction: instruction, project: project, resume: resumed, box: box,
+                    emit: { continuation.yield($0) })
+
+                // `--resume` fails outright when the stored session's transcript is
+                // gone (a cleared `~/.claude` cache, another machine), and it fails
+                // before any output — so the project's AI would stay stuck on every
+                // future turn. Forget the session and take one fresh run instead.
+                if turn.reply == nil, resumed != nil, !Task.isCancelled {
+                    SessionStore.shared.clearSession(for: project)
+                    turn = self.attempt(
+                        path, instruction: instruction, project: project, resume: nil, box: box,
+                        emit: { continuation.yield($0) })
                 }
-                let reply = result ?? (streamed.isEmpty ? nil : streamed)
-                continuation.yield(.finished(reply: reply, usage: usage))
+
+                continuation.yield(
+                    .finished(reply: turn.reply ?? Self.failure(turn.error), usage: turn.usage))
                 continuation.finish()
             }
 
@@ -132,8 +127,53 @@ final class ClaudeService: AgentService {
         }
     }
 
+    /// Run the CLI once and collect the turn: the final reply (nil when it produced
+    /// none), its token usage, and anything it wrote to stderr.
+    private func attempt(
+        _ path: String, instruction: String, project: Project, resume: String?, box: ProcessBox,
+        emit: @escaping (TurnEvent) -> Void
+    ) -> (reply: String?, usage: AgentUsage?, error: String) {
+        var result: String?
+        var usage: AgentUsage?
+        var error = ""
+        // Accumulates the last streamed text block, used as the reply when the
+        // process is cut short (timeout/cancel) before a `result`.
+        var streamed = ""
+
+        Shell.stream(
+            path, arguments(for: instruction, in: project, resume: resume), cwd: project.root,
+            timeout: Self.turnTimeout,
+            onStart: { box.set($0) },
+            onError: { error = $0 }
+        ) { line in
+            self.handle(
+                line, project: project,
+                emit: { event in
+                    switch event {
+                    case .replyReset: streamed = ""
+                    case .replyDelta(let text): streamed += text
+                    default: break
+                    }
+                    emit(event)
+                },
+                setResult: { result = $0 }, setUsage: { usage = $0 })
+        }
+
+        return (result ?? (streamed.isEmpty ? nil : streamed), usage, error)
+    }
+
+    /// The CLI's own complaint, as the reply for a turn that produced nothing —
+    /// its last non-empty stderr line, which carries the actual cause.
+    private static func failure(_ error: String) -> String? {
+        error.split(separator: "\n")
+            .last { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            .map(String.init)
+    }
+
     /// The `claude` CLI arguments for one streaming turn.
-    private func arguments(for instruction: String, in project: Project) -> [String] {
+    private func arguments(for instruction: String, in project: Project, resume: String?)
+        -> [String]
+    {
         var args = [
             "-p", instruction,
             // Headless `-p` can't answer permission prompts; the default
@@ -146,9 +186,7 @@ final class ClaudeService: AgentService {
             "--include-partial-messages",
             "--model", SettingsStore.shared.model.rawValue,
         ]
-        if let sessionID = SessionStore.shared.session(for: project) {
-            args += ["--resume", sessionID]
-        }
+        if let resume { args += ["--resume", resume] }
         return args
     }
 
