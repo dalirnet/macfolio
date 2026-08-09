@@ -2,11 +2,22 @@ import Foundation
 
 /// Thin wrapper over `Process` — run a binary, optionally capture stdout.
 enum Shell {
+    /// The environment every child process gets: ours, plus the configured proxy.
+    /// A launched `.app` inherits launchd's environment rather than the shell's, so
+    /// without this the Claude Code CLI would connect directly — it reads proxy
+    /// settings only from these variables.
+    private static func environment(_ extra: [String: String] = [:]) -> [String: String] {
+        ProcessInfo.processInfo.environment
+            .merging(Proxy.environment) { _, new in new }
+            .merging(extra) { _, new in new }
+    }
+
     @discardableResult
     static func run(_ executable: String, _ args: [String], cwd: URL? = nil) -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = args
+        process.environment = environment()
         if let cwd { process.currentDirectoryURL = cwd }
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
@@ -26,9 +37,7 @@ enum Shell {
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = args
         if let cwd { process.currentDirectoryURL = cwd }
-        if let env {
-            process.environment = ProcessInfo.processInfo.environment.merging(env) { _, new in new }
-        }
+        process.environment = environment(env ?? [:])
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
@@ -71,6 +80,7 @@ enum Shell {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = args
+        process.environment = environment()
         if let cwd { process.currentDirectoryURL = cwd }
         let pipe = Pipe()
         process.standardOutput = pipe

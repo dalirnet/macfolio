@@ -44,6 +44,20 @@
                     case .claudeCode:
                         EmptyView()
                     }
+
+                    Section("Network") {
+                        Picker("Proxy", selection: $settings.proxyMode) {
+                            ForEach(SettingsStore.ProxyMode.allCases) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        if settings.proxyMode == .custom {
+                            TextField("http://127.0.0.1:3128", text: $settings.proxyURL)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .keyboardType(.URL)
+                        }
+                    }
                 }
                 .navigationTitle("Settings")
                 .navigationBarTitleDisplayMode(.inline)

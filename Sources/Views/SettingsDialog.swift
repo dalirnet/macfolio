@@ -5,6 +5,8 @@ import AppKit
 ///   • Claude Code — model + permission mode (the CLI's file-tool permissions).
 ///   • Claude API  — API key + model.
 ///   • OpenAI      — API key + model.
+/// Below them, a proxy popup that applies to every backend — with an address field
+/// when it's set to Custom.
 /// A SwiftUI `.alert` can't host these, so it's built with AppKit.
 enum SettingsDialog {
     @MainActor
@@ -14,6 +16,7 @@ enum SettingsDialog {
         let models = SettingsStore.Model.allCases
         let openAIModels = SettingsStore.OpenAIModel.allCases
         let modes = SettingsStore.PermissionMode.allCases
+        let proxyModes = SettingsStore.ProxyMode.allCases
 
         let providerPopup = DialogField.callbackPopup(providers.map { $0.displayName })
         providerPopup.selectItem(at: providers.firstIndex(of: settings.provider) ?? 0)
@@ -51,11 +54,21 @@ enum SettingsDialog {
             DialogField.labeled("API Key", openAIKeyField),
         ])
 
+        // Network section — shown for every provider, since the proxy applies to
+        // both the CLI and the API backends.
+        let proxyPopup = DialogField.callbackPopup(proxyModes.map { $0.displayName })
+        proxyPopup.selectItem(at: proxyModes.firstIndex(of: settings.proxyMode) ?? 0)
+        let proxyField = DialogField.textField(settings.proxyURL)
+        proxyField.placeholderString = "http://127.0.0.1:3128"
+        let proxyURLRow = DialogField.labeled("Proxy Address", proxyField)
+
         let accessory = DialogField.accessory([
             DialogField.labeled("AI Provider", providerPopup),
             claudeCodeSection,
             claudeAPISection,
             openAISection,
+            DialogField.labeled("Network", proxyPopup),
+            proxyURLRow,
         ])
 
         let alert = NSAlert()
@@ -73,11 +86,15 @@ enum SettingsDialog {
             claudeCodeSection.isHidden = provider != .claudeCode
             claudeAPISection.isHidden = provider != .claudeAPI
             openAISection.isHidden = provider != .openAI
+            let proxyIndex = proxyPopup.indexOfSelectedItem
+            proxyURLRow.isHidden =
+                !proxyModes.indices.contains(proxyIndex) || proxyModes[proxyIndex] != .custom
             accessory.layoutSubtreeIfNeeded()
             accessory.frame.size = accessory.fittingSize
             alert.layout()
         }
         providerPopup.onChange = sync
+        proxyPopup.onChange = sync
         sync()
 
         let apply: (NSApplication.ModalResponse) -> Void = { response in
@@ -107,6 +124,11 @@ enum SettingsDialog {
                     settings.openAIModel = openAIModels[openAIModelPopup.indexOfSelectedItem]
                 }
             }
+
+            if proxyModes.indices.contains(proxyPopup.indexOfSelectedItem) {
+                settings.proxyMode = proxyModes[proxyPopup.indexOfSelectedItem]
+            }
+            settings.proxyURL = proxyField.stringValue
         }
 
         if let window = NSApp.keyWindow {

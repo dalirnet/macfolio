@@ -20,6 +20,10 @@ final class SettingsStore: ObservableObject {
     @Published var openAIKey: String { didSet { save() } }
     @Published var openAIModel: OpenAIModel { didSet { save() } }
 
+    // Network: how every backend reaches the internet (see `Proxy`).
+    @Published var proxyMode: ProxyMode { didSet { save() } }
+    @Published var proxyURL: String { didSet { save() } }
+
     /// The co-authoring backend.
     enum Provider: String, CaseIterable, Identifiable, Codable {
         case claudeCode
@@ -87,6 +91,23 @@ final class SettingsStore: ObservableObject {
         }
     }
 
+    /// Where the proxy comes from. "System" follows the proxy macOS is configured
+    /// with; "Custom" uses the address typed in Settings. Either way it applies to
+    /// the API backends *and* the Claude Code CLI — a launched `.app` never
+    /// inherits the shell's `HTTPS_PROXY`, so it has to be resolved here.
+    enum ProxyMode: String, CaseIterable, Identifiable, Codable {
+        case system
+        case custom
+
+        var id: String { rawValue }
+        var displayName: String {
+            switch self {
+            case .system: return "System Proxy"
+            case .custom: return "Custom Proxy"
+            }
+        }
+    }
+
     /// Claude Code `--permission-mode` values. Headless `-p` can't answer prompts,
     /// so `bypassPermissions` (the default) avoids denials.
     enum PermissionMode: String, CaseIterable, Identifiable, Codable {
@@ -122,6 +143,8 @@ final class SettingsStore: ObservableObject {
         var claudeAPIKey: String
         var openAIKey: String
         var openAIModel: OpenAIModel
+        var proxyMode: ProxyMode
+        var proxyURL: String
 
         init(_ store: SettingsStore) {
             provider = store.provider
@@ -130,6 +153,8 @@ final class SettingsStore: ObservableObject {
             claudeAPIKey = store.claudeAPIKey
             openAIKey = store.openAIKey
             openAIModel = store.openAIModel
+            proxyMode = store.proxyMode
+            proxyURL = store.proxyURL
         }
 
         // Lenient: missing keys (older settings files) fall back to defaults.
@@ -143,6 +168,8 @@ final class SettingsStore: ObservableObject {
             claudeAPIKey = (try? c.decode(String.self, forKey: .claudeAPIKey)) ?? ""
             openAIKey = (try? c.decode(String.self, forKey: .openAIKey)) ?? ""
             openAIModel = (try? c.decode(OpenAIModel.self, forKey: .openAIModel)) ?? .gpt4o
+            proxyMode = (try? c.decode(ProxyMode.self, forKey: .proxyMode)) ?? .system
+            proxyURL = (try? c.decode(String.self, forKey: .proxyURL)) ?? ""
         }
     }
 
@@ -157,6 +184,8 @@ final class SettingsStore: ObservableObject {
         claudeAPIKey = snapshot?.claudeAPIKey ?? ""
         openAIKey = snapshot?.openAIKey ?? ""
         openAIModel = snapshot?.openAIModel ?? .gpt4o
+        proxyMode = snapshot?.proxyMode ?? .system
+        proxyURL = snapshot?.proxyURL ?? ""
         loading = false
     }
 

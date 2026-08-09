@@ -195,7 +195,7 @@ final class OpenAIService: AgentService {
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await Proxy.session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw AgentError.message("No response from the endpoint.")
         }
